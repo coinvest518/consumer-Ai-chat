@@ -1,0 +1,43 @@
+supports options for bulk uploads and migrations.
+Insert data in the Astra Portal
+Insert data programmatically
+Migrate or insert large amounts of data
+Permissions required to insert data
+To insert data into an Astra DB Serverless database, you must be able to read and write to the target database, keyspace, and collection or table.
+To insert data in the Astra Portal, a valid role, such as the Database Administrator role, must be assigned directly to you.
+To insert data with the Data API, you need an application token with a valid role.
+To insert data with the standalone CQL shell or a driver, use your database’s Secure Connect Bundle (SCB) for authentication and authorization.
+Content requirements for CSV and JSON files
+If you insert data from a CSV or JSON file, the data must be compatible with Astra DB and, if applicable, the table schema.
+For example, if you insert a CSV file into a table, the CSV file must contain the same column names and data types as the table.
+If you insert a JSON file exported from a database that isn’t based on Apache Cassandra®, you might need to transform the data into a format that is compatible with Astra DB before you insert the data. For more information, see Migrate from non-Cassandra sources.
+Additionally, if your CSV or JSON file is larger than 40 MB, see Migrate or insert large amounts of data.
+See also
+Ways to find data in Astra DB Serverless
+Connect to a database
+Manage roles and permissions
+Was this helpful?
+
+thumb_up
+Yes
+
+thumb_down
+No
+© 2025 DataStax | Privacy policy | Terms of use
+Apache, Apache Cassandra, Cassandra, Apache Tomcat, Tomcat, Apache Lucene, Apache Solr, Apache Hadoop, Hadoop, Apache Pulsar, Pulsar, Apache Spark, Spark, Apache TinkerPop, TinkerPop, Apache Kafka and Kafka are either registered trademarks or trademarks of the Apache Software Foundation or its subsidiaries in Canada, the United States and/or other countries. Kubernetes is the registered trademark of the Linux Foundation.
+General Inquiries: +1 (650) 389-6000, info@datastax.com
+Astra DB Serverless
+
+GET STARTED
+expand_more
+ 
+TUTORIALS
+expand_more
+ 
+DATABASES
+expand_more
+Create a database
+Regions and maintenance schedules
+Deploy to multiple regions
+Connect to a database
+Manage keyspaces
