@@ -1,19 +1,33 @@
-import { DataAPIClient, Collection } from "@datastax/astra-db-ts";
+import { DataAPIClient } from "@datastax/astra-db-ts";
 import { v4 as uuidv4 } from 'uuid';
 import { ChatMessage, UserMetrics } from '../types';
 
+// Initialize the client with your token
+const ASTRA_DB_APPLICATION_TOKEN = process.env.ASTRA_DB_APPLICATION_TOKEN;
+const ASTRA_DB_ENDPOINT = process.env.ASTRA_DB_ENDPOINT;
+
+// Add debug logging
+console.log('Environment variables loaded:', {
+  hasToken: !!ASTRA_DB_APPLICATION_TOKEN,
+  hasEndpoint: !!ASTRA_DB_ENDPOINT,
+  endpoint: ASTRA_DB_ENDPOINT
+});
+
+if (!ASTRA_DB_APPLICATION_TOKEN || !ASTRA_DB_ENDPOINT) {
+  throw new Error("Missing required Astra DB environment variables");
+}
+
+// Initialize the client
+const client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN);
+export const astraDb = client.db(ASTRA_DB_ENDPOINT);
+
 // AstraDB configuration
-const ASTRA_TOKEN = process.env.ASTRA_TOKEN!;
-const ASTRA_ENDPOINT = process.env.ASTRA_ENDPOINT!;
 const FLOW_ID = process.env.FLOW_ID!;
 
 // Collection names
 const CHAT_HISTORY_COLLECTION = 'chat_history';
 const USER_METRICS_COLLECTION = 'user_metrics';
 
-// Initialize the client
-const client = new DataAPIClient(ASTRA_TOKEN);
-export const astraDb = client.db(ASTRA_ENDPOINT);
 export const flowId = FLOW_ID;
 
 // Initialize and check connection
@@ -23,25 +37,17 @@ export const initAstra = async () => {
     console.log('Connected to AstraDB:', collections);
     
     // Get collection names as strings
-    const collectionNames = collections.map(c => typeof c === 'string' ? c : c.name);
+    const collectionNames = collections.map((c: any) => c.name || c);
     
     // Make sure our collections exist
     if (!collectionNames.includes(CHAT_HISTORY_COLLECTION)) {
-      try {
-        await astraDb.createCollection(CHAT_HISTORY_COLLECTION);
-        console.log(`Created ${CHAT_HISTORY_COLLECTION} collection`);
-      } catch (err) {
-        console.error(`Error creating ${CHAT_HISTORY_COLLECTION} collection:`, err);
-      }
+      await astraDb.createCollection(CHAT_HISTORY_COLLECTION);
+      console.log(`Created ${CHAT_HISTORY_COLLECTION} collection`);
     }
     
     if (!collectionNames.includes(USER_METRICS_COLLECTION)) {
-      try {
-        await astraDb.createCollection(USER_METRICS_COLLECTION);
-        console.log(`Created ${USER_METRICS_COLLECTION} collection`);
-      } catch (err) {
-        console.error(`Error creating ${USER_METRICS_COLLECTION} collection:`, err);
-      }
+      await astraDb.createCollection(USER_METRICS_COLLECTION);
+      console.log(`Created ${USER_METRICS_COLLECTION} collection`);
     }
     
     return true;
@@ -51,8 +57,20 @@ export const initAstra = async () => {
   }
 };
 
+// Basic test function
+export const testConnection = async () => {
+  try {
+    const collections = await astraDb.listCollections();
+    console.log('Test connection successful. Available collections:', collections);
+    return true;
+  } catch (error) {
+    console.error('Test connection failed:', error);
+    return false;
+  }
+};
+
 // Get chat history collection
-export const getChatHistoryCollection = async (): Promise<Collection> => {
+export const getChatHistoryCollection = async (): Promise<any> => {
   try {
     return astraDb.collection(CHAT_HISTORY_COLLECTION);
   } catch (error) {
@@ -62,7 +80,7 @@ export const getChatHistoryCollection = async (): Promise<Collection> => {
 };
 
 // Get user metrics collection
-export const getUserMetricsCollection = async (): Promise<Collection> => {
+export const getUserMetricsCollection = async (): Promise<any> => {
   try {
     return astraDb.collection(USER_METRICS_COLLECTION);
   } catch (error) {
@@ -98,24 +116,34 @@ export const storeChatMessage = async (userId: string, sessionId: string, messag
   }
 };
 
+interface ChatMessageDoc {
+  _id: string;
+  userId: string;
+  sessionId: string;
+  timestamp: string;
+  type: string;
+  text: string;
+  citation?: string;
+  actions?: any[];
+  title?: string;
+}
+
 /**
  * Get chat history for a user
  * @param userId User ID to retrieve chat history for
  * @returns Array of chat message documents from AstraDB
  */
-export const getUserChatHistory = async (userId: string): Promise<any[]> => {
+export const getUserChatHistory = async (userId: string): Promise<ChatMessageDoc[]> => {
   try {
     const collection = await getChatHistoryCollection();
     const query = { userId };
     
-    // Collect all documents from cursor
     const result = await collection.find(query);
-    const messages = [];
+    const messages: ChatMessageDoc[] = [];
     for await (const doc of result) {
-      messages.push(doc);
+      messages.push(doc as ChatMessageDoc);
     }
     
-    // Sort by timestamp descending (newest first)
     return messages.sort((a, b) => {
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
@@ -130,19 +158,17 @@ export const getUserChatHistory = async (userId: string): Promise<any[]> => {
  * @param sessionId Session ID to retrieve messages for
  * @returns Array of chat message documents from AstraDB
  */
-export const getChatSessionMessages = async (sessionId: string): Promise<any[]> => {
+export const getChatSessionMessages = async (sessionId: string): Promise<ChatMessageDoc[]> => {
   try {
     const collection = await getChatHistoryCollection();
     const query = { sessionId };
     
-    // Collect all documents from cursor
     const result = await collection.find(query);
-    const messages = [];
+    const messages: ChatMessageDoc[] = [];
     for await (const doc of result) {
-      messages.push(doc);
+      messages.push(doc as ChatMessageDoc);
     }
     
-    // Sort by timestamp ascending (oldest first) for proper chat flow
     return messages.sort((a, b) => {
       return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     });

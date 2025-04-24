@@ -1,4 +1,12 @@
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+// Get Langflow API details from environment variables
+const LANGFLOW_API_URL = process.env.LANGFLOW_API_URL?.trim();
+const LANGFLOW_API_KEY = process.env.LANGFLOW_API_KEY?.trim();
+const FLOW_ID = process.env.FLOW_ID?.trim();
 
 // Define AIResponse interface here to avoid import issues
 export interface AIResponse {
@@ -7,17 +15,14 @@ export interface AIResponse {
   actions?: string[];
 }
 
-// Langflow API configuration
-const LANGFLOW_API_BASE = 'https://cloud.langflow.ai';
-const FLOW_ID = 'd2ec4675-eb79-4511-be23-85dad6279573'; // From your configuration
-
 // Define Langflow response type
 interface LangflowResponse {
-  result?: string;
-  output?: string;
-  citation?: string;
-  source?: string;
-  [key: string]: any;
+  result?: {
+    answer?: string;
+    response?: string;
+    message?: string;
+  };
+  error?: string;
 }
 
 /**
@@ -27,44 +32,69 @@ interface LangflowResponse {
  * @returns Promise containing the API response
  */
 export async function callLangflowAPI(message: string, sessionId?: string): Promise<AIResponse> {
+  if (!LANGFLOW_API_URL || !LANGFLOW_API_KEY || !FLOW_ID) {
+    console.error('Missing env vars:', { 
+      hasUrl: !!LANGFLOW_API_URL, 
+      hasKey: !!LANGFLOW_API_KEY, 
+      hasFlowId: !!FLOW_ID 
+    });
+    throw new Error('Langflow API configuration is missing');
+  }
+
   try {
-    const url = `${LANGFLOW_API_BASE}/api/v1/run/${FLOW_ID}`;
-    
-    // Prepare the request payload
-    const payload = {
-      inputs: {
-        input_value: message
-      },
-      stream: false
-    };
-    
-    // Call the Langflow API
-    const response = await fetch(url, {
+    const apiUrl = `${LANGFLOW_API_URL}/api/v1/process/${FLOW_ID}`;
+    console.log('Making request to Langflow API:', {
+      url: apiUrl,
+      message
+    });
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${LANGFLOW_API_KEY}`
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        input: {
+          question: message
+        },
+        chat_history: []
+      })
     });
-    
+
     if (!response.ok) {
-      throw new Error(`Langflow API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Langflow API error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Langflow API error: ${response.status} - ${response.statusText}`);
+    }
+
+    const data = await response.json() as LangflowResponse;
+    console.log('Langflow raw response:', data);
+    
+    if (data.error) {
+      throw new Error(`Langflow API error: ${data.error}`);
     }
     
-    // Parse and return the response
-    const data = await response.json() as LangflowResponse;
-    
-    // Extract relevant information from the response
+    // Extract the response from Langflow's output
+    let text = "Sorry, I couldn't process that.";
+    if (data.result?.answer) {
+      text = data.result.answer;
+    } else if (data.result?.response) {
+      text = data.result.response;
+    } else if (data.result?.message) {
+      text = data.result.message;
+    }
+
     return {
-      text: data.result || data.output || "I couldn't find specific information on that topic.",
-      citation: data.citation || data.source,
+      text,
       actions: ["Ask Follow-up", "Save Answer"]
     };
   } catch (error) {
     console.error('Error calling Langflow API:', error);
-    return {
-      text: "I'm having trouble connecting to my knowledge base. Please try again later.",
-      actions: ["Try Again"]
-    };
+    throw error;
   }
-}
+} 
