@@ -2,10 +2,17 @@ export interface Message {
   id?: string;
   text: string;
   sender: 'user' | 'bot';
-  type: 'user' | 'ai';
+  type: 'user' | 'ai' | 'email';
   timestamp: number;
   citation?: string;
   actions?: string[];
+  emailMetadata?: {
+    subject: string;
+    body: string;
+    sender?: string;
+    recipients?: string[];
+    isProcessed?: boolean;
+  };
 }
 
 export interface Chat {

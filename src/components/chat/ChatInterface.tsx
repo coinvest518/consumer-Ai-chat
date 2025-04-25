@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Brain, MessageSquare, CheckCircle, XCircle, Circle } from "lucide-react";
+import { Send, Loader2, Brain, MessageSquare, CheckCircle, XCircle, Circle, PlusCircle, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +8,20 @@ import { useChat } from "@/hooks/useChat";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Message } from "@/lib/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { API_BASE_URL } from "@/lib/config";
+import { 
+  Dialog, 
+  DialogTrigger, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { v4 as uuidv4 } from "uuid";
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -46,17 +60,24 @@ const AI_STEPS: Record<string, StepIndicator> = {
 
 export default function ChatInterface({ messages, onSendMessage, isLoading, showProgress }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { 
     sendMessage, 
-    error,     // Add usage for error
+    error,
     chatLimits,
-    clearChat  // Add usage for clearChat
+    clearChat,
+    setMessages
   } = useChat();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<keyof typeof AI_STEPS | null>(null);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [emailForm, setEmailForm] = useState({
+    subject: "",
+    body: ""
+  });
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -83,6 +104,7 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
   }, [error, toast]);
 
   const remainingChats = chatLimits.dailyLimit - chatLimits.chatsUsedToday;
+  const isLimitReached = !chatLimits.isProUser && chatLimits.chatsUsedToday >= chatLimits.dailyLimit;
 
   // Add clear chat button in header
   const handleClearChat = () => {
@@ -97,6 +119,16 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
+    
+    // Prevent submission if limit reached
+    if (isLimitReached) {
+      toast({
+        title: "Daily Limit Reached",
+        description: "You've used all your credits. Purchase more to continue chatting.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const messageText = inputValue;
     setInputValue("");
@@ -124,6 +156,83 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
       console.error('Error:', error);
       setCurrentStep(null);
       setProgress(0);
+      
+      // Check if error is specific to credit limit
+      if (error instanceof Error && error.message === 'Credit limit reached') {
+        toast({
+          title: "Daily Limit Reached",
+          description: "You've used all your credits. Purchase more to continue chatting.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "An unexpected error occurred",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleEmailSubmit = async () => {
+    if (!emailForm.subject.trim() || !emailForm.body.trim()) {
+      toast({
+        title: "Incomplete form",
+        description: "Please provide both subject and body for the email",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setCurrentStep('processing');
+      setProgress(33);
+      
+      // Create email message with proper metadata
+      const newMessage: Message = {
+        id: uuidv4(),
+        text: "Email for analysis",
+        sender: 'user',
+        type: 'email',
+        timestamp: Date.now(),
+        emailMetadata: {
+          subject: emailForm.subject,
+          body: emailForm.body,
+          sender: user?.email || '',
+          recipients: []
+        }
+      };
+
+      // Add message to chat
+      const updatedMessages = [...messages, newMessage];
+      setMessages(updatedMessages);
+      
+      // Send through chat flow
+      await onSendMessage(JSON.stringify({
+        type: 'email',
+        subject: emailForm.subject,
+        body: emailForm.body
+      }));
+      
+      // Reset form and close dialog
+      setEmailForm({
+        subject: "",
+        body: ""
+      });
+      setIsDialogOpen(false);
+      
+      setCurrentStep(null);
+      setProgress(100);
+      
+      toast({
+        title: "Email Added",
+        description: "Your email has been added to the chat for processing",
+      });
+    } catch (error) {
+      console.error('Error processing email:', error);
+      setCurrentStep(null);
+      setProgress(0);
+      
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -133,8 +242,6 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
   };
 
   const renderLimitStatus = () => {
-    const remaining = chatLimits.dailyLimit - chatLimits.chatsUsedToday;
-    
     if (chatLimits.isProUser) {
       return <div className="text-sm text-gray-500">Pro User: Unlimited Access</div>;
     }
@@ -142,21 +249,21 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
     return (
       <div className="p-4 text-center">
         <div className="text-sm text-gray-600">
-          {remaining > 0 ? (
-            `${remaining} free messages remaining today`
+          {!isLimitReached ? (
+            `${remainingChats} credit${remainingChats !== 1 ? 's' : ''} remaining`
           ) : (
             <div className="text-red-500">
-              Daily limit reached. Resets at midnight.
+              Daily limit reached. You've used all your credits.
             </div>
           )}
         </div>
-        {remaining <= 2 && (
+        {(remainingChats <= 2 || isLimitReached) && (
           <Button 
             variant="default" 
             className="mt-2"
-            onClick={() => window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU'}
+            onClick={() => window.location.href = 'https://consumer-ai.vercel.app/dashboard'}
           >
-            Upgrade to Pro for Unlimited Access
+            Get 50 More Credits
           </Button>
         )}
       </div>
@@ -215,25 +322,82 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 border-t flex items-center">
-          <Input
-            type="text"
-            className="flex-1 border-gray-300 focus:ring-primary focus:border-primary block w-full rounded-md sm:text-sm border p-2"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            disabled={!chatLimits.isProUser && chatLimits.chatsUsedToday >= chatLimits.dailyLimit}
-            placeholder={
-              chatLimits.chatsUsedToday >= chatLimits.dailyLimit 
-                ? "Daily limit reached. Please upgrade to continue."
-                : "Ask about consumer laws, credit reports, debt collection..."
-            }
-          />
-          <Button
-            type="submit"
-            className="ml-3 p-2 rounded-full h-10 w-10 flex items-center justify-center"
-          >
-            <Send className="h-5 w-5" />
-          </Button>
+        <form onSubmit={handleSubmit} className="p-4 border-t">
+          <div className="flex items-center gap-4 w-full">
+            <div className="flex-1">
+              <Input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                disabled={isLimitReached}
+                placeholder={
+                  isLimitReached 
+                    ? "Daily limit reached. Purchase more credits to continue."
+                    : "Ask about consumer laws, credit reports, debt collection..."
+                }
+                className="w-full"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="p-2 rounded-full h-10 w-10 flex items-center justify-center shrink-0"
+                    disabled={isLimitReached}
+                    title="Add Email"
+                  >
+                    <Mail className="h-5 w-5" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Email to Chat</DialogTitle>
+                    <DialogDescription>
+                      Paste an email you want the AI to analyze or process.
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Email Subject</label>
+                      <Input
+                        value={emailForm.subject}
+                        onChange={(e) => setEmailForm({...emailForm, subject: e.target.value})}
+                        placeholder="Enter email subject"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Email Body</label>
+                      <Textarea
+                        value={emailForm.body}
+                        onChange={(e) => setEmailForm({...emailForm, body: e.target.value})}
+                        placeholder="Paste the email content here"
+                        rows={8}
+                      />
+                    </div>
+                  </div>
+                  
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button onClick={handleEmailSubmit}>Process Email</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              
+              <Button
+                type="submit"
+                className="p-2 rounded-full h-10 w-10 flex items-center justify-center shrink-0"
+                disabled={isLimitReached || !inputValue.trim()}
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
         </form>
         
         {renderLimitStatus()}

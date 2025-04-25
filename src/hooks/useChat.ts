@@ -112,8 +112,8 @@ export function useChat() {
     if (!userInput.trim()) return;
 
     if (!chatLimits.isProUser && chatLimits.chatsUsedToday >= chatLimits.dailyLimit) {
-      setError('You have reached your daily limit. Please upgrade to Pro to continue chatting.');
-      throw new Error('Daily chat limit reached');
+      setError('Daily limit reached. You\'ve used all your credits. Purchase more to continue chatting.');
+      throw new Error('Credit limit reached');
     }
 
     const userMessage: Message = {

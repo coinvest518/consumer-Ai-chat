@@ -4,6 +4,9 @@
   "description": "Backend server for Consumer AI Chat",
   "type": "module",
   "main": "dist/src/server.js",
+  "exports": {
+    ".": "./dist/src/server.js"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/src/server.js",

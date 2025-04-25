@@ -3,8 +3,9 @@ import type { Request, Response } from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
 import { DataAPIClient } from '@datastax/astra-db-ts';
-import { callLangflowAPI, type AIResponse } from '../langflow';
+import { callLangflowAPI, type AIResponse } from './langflow.js';
 import Stripe from 'stripe';
+import { EmailMessage, ScheduledEmail } from '../types';
 
 // Define simple response type
 interface APIResponse {
@@ -63,10 +64,14 @@ const db = client.db(process.env.ASTRA_DB_ENDPOINT!, {
 // Initialize collections
 const userMetricsCollection = db.collection('user_metrics');
 const chatHistoryCollection = db.collection('chat_history');
+const emailCollection = db.collection('emails');
+const scheduledEmailCollection = db.collection('scheduled_emails');
 
 const collections = {
   userMetricsCollection,
-  chatHistoryCollection
+  chatHistoryCollection,
+  emailCollection,
+  scheduledEmailCollection
 };
 
 interface ChatRequest {
@@ -125,6 +130,35 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
       });
     }
 
+    // Check if this is an email message
+    const isEmailMessage = message.startsWith('Process this email:');
+    let emailData = null;
+
+    if (isEmailMessage) {
+      // Extract email subject and body
+      const emailLines = message.split('\n');
+      const subjectLine = emailLines.find(line => line.startsWith('Subject:'));
+      const bodyStartIndex = emailLines.indexOf('Body:');
+      
+      if (subjectLine && bodyStartIndex !== -1) {
+        const subject = subjectLine.replace('Subject:', '').trim();
+        const body = emailLines.slice(bodyStartIndex + 1).join('\n').trim();
+        
+        // Store email in email collection
+        emailData = {
+          userId: req.body.userId,
+          subject,
+          body,
+          sender: '',
+          recipients: [],
+          timestamp: new Date().toISOString(),
+          isRead: false
+        };
+        
+        await collections.emailCollection.insertOne(emailData);
+      }
+    }
+
     // Use the imported callLangflowAPI function for API calls
     try {
       // First attempt with the callLangflowAPI helper
@@ -151,12 +185,19 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
         { upsert: true }
       );
 
-      return res.json({ 
+      // If this was an email message, include the email data in response
+      const responseData = {
         text: response.response,
         chatsUsed: updatedMetrics.chatsUsed,
         dailyLimit: updatedMetrics.dailyLimit,
         remaining: updatedMetrics.dailyLimit - updatedMetrics.chatsUsed
-      });
+      };
+
+      if (emailData) {
+        Object.assign(responseData, { emailData });
+      }
+
+      return res.json(responseData);
     } catch (error) {
       console.error('LangflowAPI error, falling back to direct API call:', error);
       
@@ -392,24 +433,45 @@ app.get('/api/verify-payment/:sessionId', async (req: Request, res: Response) =>
       // Use metadata userId first, then customer ID, then email
       const userId = metadataUserId || customerId || customerEmail;
       
-      // Update user metrics to Pro
+      // Get current user metrics
+      const currentMetrics = await collections.userMetricsCollection.findOne({ userId }) || {
+        dailyLimit: 5,
+        chatsUsed: 0,
+        isPro: false,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      // Update user metrics - add 50 more credits instead of Pro upgrade
       await collections.userMetricsCollection.updateOne(
         { userId },
         { 
           $set: {
-            isPro: true,
-            dailyLimit: 1000, // Set a high limit for Pro users
+            // Add 50 to the daily limit
+            dailyLimit: currentMetrics.dailyLimit + 50,
+            lastPurchase: new Date().toISOString(),
             lastUpdated: new Date().toISOString()
           }
         },
         { upsert: true }
       );
       
+      // Create a purchase record
+      await collections.chatHistoryCollection.insertOne({
+        userId,
+        type: 'purchase',
+        credits: 50,
+        amount: 9.99,
+        stripeSessionId: sessionId,
+        timestamp: new Date().toISOString()
+      });
+      
       res.json({
         paid: true,
         userId,
         customerEmail,
-        customerId
+        customerId,
+        creditsAdded: 50,
+        newLimit: currentMetrics.dailyLimit + 50
       });
     } else {
       res.json({
@@ -486,6 +548,105 @@ app.get('/api/debug', (req, res) => {
       environment: process.env.VERCEL_ENV
     }
   });
+});
+
+// Implement the email endpoint
+app.post('/api/emails', async (req, res) => {
+  try {
+    const { userId, sender, recipients, subject, body, metadata } = req.body;
+    
+    if (!userId || !subject || !body) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    // Store the email
+    const emailData: EmailMessage = {
+      userId,
+      sender: sender || '',
+      recipients: recipients || [],
+      subject,
+      body,
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      metadata
+    };
+    
+    const result = await collections.emailCollection.insertOne(emailData);
+    const emailId = result.insertedId;
+    
+    // Process with Langflow
+    const emailContent = `
+      From: ${emailData.sender}
+      Subject: ${emailData.subject}
+      
+      ${emailData.body}
+    `;
+    
+    // Call Langflow API with the email content
+    const aiResponse = await callLangflowAPI(emailContent, userId);
+    
+    // Mark email as processed
+    await collections.emailCollection.updateOne(
+      { _id: emailId },
+      { $set: { isRead: true } }
+    );
+    
+    res.status(201).json({
+      email: {
+        id: emailId,
+        ...emailData
+      },
+      aiResponse: aiResponse.text
+    });
+  } catch (error) {
+    console.error('Error processing email:', error);
+    res.status(500).json({ error: 'Failed to process email' });
+  }
+});
+
+// Implement get emails endpoint
+app.get('/api/emails/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const cursor = await collections.emailCollection.find({ userId });
+    const emails = await cursor.toArray();
+    res.json(emails);
+  } catch (error) {
+    console.error('Error fetching emails:', error);
+    res.status(500).json({ error: 'Failed to fetch emails' });
+  }
+});
+
+// Implement email scheduling endpoint
+app.post('/api/emails/schedule', async (req, res) => {
+  try {
+    const { userId, recipients, subject, body, scheduledTime } = req.body;
+    
+    if (!userId || !recipients || !subject || !body || !scheduledTime) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    const scheduledEmail: ScheduledEmail = {
+      userId,
+      recipients: Array.isArray(recipients) ? recipients : [recipients],
+      subject,
+      body,
+      scheduledTime: new Date(scheduledTime).toISOString(),
+      status: 'scheduled',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    const result = await collections.scheduledEmailCollection.insertOne(scheduledEmail);
+    
+    res.status(201).json({
+      id: result.insertedId,
+      message: 'Email scheduled successfully'
+    });
+  } catch (error) {
+    console.error('Error scheduling email:', error);
+    res.status(500).json({ error: 'Failed to schedule email' });
+  }
 });
 
 app.listen(port, () => {

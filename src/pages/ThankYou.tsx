@@ -116,19 +116,20 @@ const ThankYou = () => {
             <h1 className="text-2xl font-bold text-gray-900">Thank You for Your Purchase!</h1>
             
             <p className="mt-4 text-sm text-gray-600">
-              Your Pro account has been activated. You now have unlimited access to Consumer AI.
+              We've added <span className="font-bold">50 credits</span> to your account. 
+              You can now continue asking more questions.
             </p>
             
             {!user && (
               <p className="mt-2 text-sm text-amber-600">
-                You'll be redirected to the login page shortly to access your Pro features.
+                You'll be redirected to the login page shortly to access your additional credits.
               </p>
             )}
 
             <div className="mt-8">
               <Button asChild className="w-full">
                 <Link to={user ? "/chat" : "/login"}>
-                  {user ? "Start Chatting Now" : "Log In to Continue"}
+                  {user ? "Continue Chatting" : "Log In to Continue"}
                 </Link>
               </Button>
             </div>

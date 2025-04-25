@@ -35,6 +35,11 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const { chatSessions } = useChat();
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
+  const [metrics, setMetrics] = useState({
+    dailyLimit: 5,
+    chatsUsed: 0,
+    remaining: 5
+  });
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -58,8 +63,24 @@ const Dashboard = () => {
       }
     };
 
+    const fetchMetrics = async () => {
+      try {
+        if (!user) return;
+        
+        const metricsData = await api.getChatLimits();
+        setMetrics({
+          dailyLimit: metricsData.dailyLimit || 5,
+          chatsUsed: metricsData.chatsUsed || 0,
+          remaining: (metricsData.dailyLimit || 5) - (metricsData.chatsUsed || 0)
+        });
+      } catch (err) {
+        console.error('Error fetching metrics:', err);
+      }
+    };
+
     if (user) {
       fetchChatHistory();
+      fetchMetrics();
     }
   }, [user, authLoading, navigate]);
 
@@ -173,12 +194,12 @@ const Dashboard = () => {
               <CardContent>
                 <div className="flex flex-col gap-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Questions Remaining Today:</span>
-                    <span className="font-medium">5/5</span>
+                    <span className="text-gray-600">Questions Remaining:</span>
+                    <span className="font-medium">{metrics.remaining}/{metrics.dailyLimit}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Account Type:</span>
-                    <span className="font-medium">Free Tier</span>
+                    <span className="text-gray-600">Questions Asked:</span>
+                    <span className="font-medium">{metrics.chatsUsed}</span>
                   </div>
                   <div className="mt-4">
                     <Button 
@@ -187,7 +208,7 @@ const Dashboard = () => {
                       onClick={handleProUpgrade}
                       disabled={isUpgradeLoading}
                     >
-                      {isUpgradeLoading ? 'Processing...' : 'Upgrade to Pro'}
+                      {isUpgradeLoading ? 'Processing...' : 'Get 50 More Credits ($9.99)'}
                     </Button>
                   </div>
                 </div>

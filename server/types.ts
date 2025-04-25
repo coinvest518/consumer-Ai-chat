@@ -26,3 +26,30 @@ export interface UserMetrics {
   createdAt: string;
   updatedAt: string;
 }
+
+// Add email-related types
+export interface EmailMessage {
+  _id?: string;
+  userId: string;           // Links to existing user
+  sender: string;           // Email sender address
+  recipients: string[];     // List of recipient addresses
+  subject: string;          // Email subject
+  body: string;             // Email content
+  timestamp: string;        // When the email was received/sent
+  isRead: boolean;          // Whether the email has been read
+  labels?: string[];        // Optional categorization
+  metadata?: any;           // Additional email data
+}
+
+// For scheduled/future emails
+export interface ScheduledEmail {
+  _id?: string;
+  userId: string;           // Links to existing user
+  recipients: string[];     // Recipients to send to
+  subject: string;          // Email subject
+  body: string;             // Email content  
+  scheduledTime: string;    // When to send the email
+  status: 'scheduled' | 'sent' | 'failed';  // Status tracking
+  createdAt: string;        // Creation timestamp
+  updatedAt: string;        // Last update timestamp
+}

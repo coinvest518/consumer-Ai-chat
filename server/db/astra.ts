@@ -1,6 +1,6 @@
 import { DataAPIClient } from "@datastax/astra-db-ts";
 import { v4 as uuidv4 } from 'uuid';
-import { ChatMessage, UserMetrics } from '../types';
+import { ChatMessage, UserMetrics, EmailMessage, ScheduledEmail } from '../types';
 
 // Initialize the client with your token
 const ASTRA_DB_APPLICATION_TOKEN = process.env.ASTRA_DB_APPLICATION_TOKEN;
@@ -27,6 +27,8 @@ const FLOW_ID = process.env.FLOW_ID!;
 // Collection names
 const CHAT_HISTORY_COLLECTION = 'chat_history';
 const USER_METRICS_COLLECTION = 'user_metrics';
+const EMAIL_COLLECTION = 'emails';
+const SCHEDULED_EMAIL_COLLECTION = 'scheduled_emails';
 
 export const flowId = FLOW_ID;
 
@@ -48,6 +50,16 @@ export const initAstra = async () => {
     if (!collectionNames.includes(USER_METRICS_COLLECTION)) {
       await astraDb.createCollection(USER_METRICS_COLLECTION);
       console.log(`Created ${USER_METRICS_COLLECTION} collection`);
+    }
+    
+    if (!collectionNames.includes(EMAIL_COLLECTION)) {
+      await astraDb.createCollection(EMAIL_COLLECTION);
+      console.log(`Created ${EMAIL_COLLECTION} collection`);
+    }
+    
+    if (!collectionNames.includes(SCHEDULED_EMAIL_COLLECTION)) {
+      await astraDb.createCollection(SCHEDULED_EMAIL_COLLECTION);
+      console.log(`Created ${SCHEDULED_EMAIL_COLLECTION} collection`);
     }
     
     return true;
@@ -85,6 +97,26 @@ export const getUserMetricsCollection = async (): Promise<any> => {
     return astraDb.collection(USER_METRICS_COLLECTION);
   } catch (error) {
     console.error('Error getting user metrics collection:', error);
+    throw error;
+  }
+};
+
+// Get email collection
+export const getEmailCollection = async () => {
+  try {
+    return astraDb.collection(EMAIL_COLLECTION);
+  } catch (error) {
+    console.error('Error getting email collection:', error);
+    throw error;
+  }
+};
+
+// Get scheduled email collection
+export const getScheduledEmailCollection = async () => {
+  try {
+    return astraDb.collection(SCHEDULED_EMAIL_COLLECTION);
+  } catch (error) {
+    console.error('Error getting scheduled email collection:', error);
     throw error;
   }
 };
@@ -213,6 +245,81 @@ export const updateUserMetrics = async (userId: string, metrics: Partial<UserMet
     }
   } catch (error) {
     console.error('Error updating user metrics:', error);
+    throw error;
+  }
+};
+
+// Store a new email
+export const storeEmail = async (email: EmailMessage) => {
+  try {
+    const collection = await getEmailCollection();
+    const emailId = email._id || uuidv4();
+    
+    const emailDoc = {
+      _id: emailId,
+      userId: email.userId,
+      sender: email.sender,
+      recipients: email.recipients,
+      subject: email.subject,
+      body: email.body,
+      timestamp: email.timestamp || new Date().toISOString(),
+      isRead: email.isRead || false,
+      labels: email.labels || [],
+      metadata: email.metadata || {}
+    };
+    
+    await collection.insertOne(emailDoc);
+    return emailId;
+  } catch (error) {
+    console.error('Error storing email:', error);
+    throw error;
+  }
+};
+
+// Get emails for a user
+export const getUserEmails = async (userId: string) => {
+  try {
+    const collection = await getEmailCollection();
+    const query = { userId };
+    
+    const result = await collection.find(query);
+    const emails: EmailMessage[] = [];
+    
+    for await (const doc of result) {
+      emails.push(doc as EmailMessage);
+    }
+    
+    return emails.sort((a, b) => {
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
+  } catch (error) {
+    console.error('Error getting user emails:', error);
+    throw error;
+  }
+};
+
+// Schedule an email for future sending
+export const scheduleEmail = async (email: ScheduledEmail) => {
+  try {
+    const collection = await getScheduledEmailCollection();
+    const emailId = email._id || uuidv4();
+    
+    const emailDoc = {
+      _id: emailId,
+      userId: email.userId,
+      recipients: email.recipients,
+      subject: email.subject,
+      body: email.body,
+      scheduledTime: email.scheduledTime,
+      status: 'scheduled',
+      createdAt: email.createdAt || new Date().toISOString(),
+      updatedAt: email.updatedAt || new Date().toISOString()
+    };
+    
+    await collection.insertOne(emailDoc);
+    return emailId;
+  } catch (error) {
+    console.error('Error scheduling email:', error);
     throw error;
   }
 };

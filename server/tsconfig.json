@@ -3,13 +3,16 @@
     "target": "ES2020",                     /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
     "module": "ESNext",
     "moduleResolution": "node",
-    "lib": ["es2020"],
+    "lib": ["es2020", "dom"],
     "strict": true,                        /* Enable all strict type-checking options. */
     "esModuleInterop": true,               /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
     "skipLibCheck": true,                  /* Skip type checking all .d.ts files. */
     "forceConsistentCasingInFileNames": true, /* Ensure that casing is correct in imports. */
-    "outDir": "dist"
+    "outDir": "dist",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
   },
-  "include": ["src/**/*"],                 /* Specifies an array of filenames or patterns to include in the program. */
+  "include": ["src/**/*", "types.ts"],                 /* Specifies an array of filenames or patterns to include in the program. */
   "exclude": ["node_modules"]
 } 
