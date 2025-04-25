@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Brain, MessageSquare, CheckCircle, XCircle, Circle, PlusCircle, Mail } from "lucide-react";
+import { Send, Loader2, Brain, MessageSquare, CheckCircle, XCircle, Circle, PlusCircle, Mail, CreditCard, TrendingUp, Building, DollarSign, Bot, Database, Mic, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -271,8 +271,126 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
 
   console.log("ChatInterface received messages:", messages);
 
+  const serviceLinks = [
+    {
+      name: "Tradeline Supply",
+      description: "Authorized User Tradelines",
+      icon: CreditCard,
+      url: "https://www.tkqlhce.com/click-101325994-13520451",
+      color: "bg-blue-500 hover:bg-blue-600"
+    },
+    {
+      name: "Ava Finance",
+      description: "Build Credit Fast",
+      icon: TrendingUp,
+      url: "https://meetava.sjv.io/anDyvY",
+      color: "bg-purple-500 hover:bg-purple-600"
+    },
+    {
+      name: "Notion AI",
+      description: "Smart Workspace",
+      icon: Bot,
+      url: "https://affiliate.notion.so/5bs3ysbrqs3b-4y5a7",
+      color: "bg-gray-800 hover:bg-gray-900"
+    },
+    {
+      name: "Bright Data",
+      description: "Web Data Platform",
+      icon: Database,
+      url: "https://brightdata.com",
+      color: "bg-green-500 hover:bg-green-600"
+    },
+    {
+      name: "ElevenLabs",
+      description: "AI Voice Generation",
+      icon: Mic,
+      url: "https://try.elevenlabs.io/2dh4kqbqw25i",
+      color: "bg-indigo-500 hover:bg-indigo-600"
+    },
+    {
+      name: "Kikoff",
+      description: "Credit Building",
+      icon: CreditCard,
+      url: "https://kikoff.com/refer/67PP77ZH",
+      color: "bg-pink-500 hover:bg-pink-600"
+    }
+  ];
+
+  const creditBuildingLinks = [
+    {
+      name: "Brigit",
+      description: "Get $15 Free",
+      icon: DollarSign,
+      url: "https://brigit.app.link/cpFcNVSajub",
+      color: "bg-orange-500 hover:bg-orange-600"
+    },
+    {
+      name: "Grow Credit",
+      description: "Build Credit History",
+      icon: TrendingUp,
+      url: "https://growcredit.com",
+      color: "bg-teal-500 hover:bg-teal-600"
+    },
+    {
+      name: "Credit Strong",
+      description: "Credit Building Loans",
+      icon: Building,
+      url: "https://www.creditstrong.com",
+      color: "bg-cyan-500 hover:bg-cyan-600"
+    },
+    {
+      name: "RentReporter",
+      description: "Special Discount",
+      icon: BadgeCheck,
+      url: "https://prf.hn/click/camref:1101l3G9fN",
+      color: "bg-rose-500 hover:bg-rose-600"
+    }
+  ];
+
   return (
-    <div className="max-w-3xl mx-auto relative">
+    <div className="max-w-4xl mx-auto relative space-y-6">
+      {/* Services Section */}
+      <div className="bg-white rounded-lg shadow-xl p-6">
+        <h2 className="text-2xl font-semibold mb-6 text-center text-gray-800">
+          Recommended Financial Services
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {serviceLinks.map((service, index) => (
+            <a
+              key={index}
+              href={service.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${service.color} text-white rounded-lg p-4 transition-transform hover:scale-105 flex flex-col items-center text-center space-y-2`}
+            >
+              <service.icon className="h-8 w-8 mb-2" />
+              <span className="font-semibold">{service.name}</span>
+              <span className="text-sm opacity-90">{service.description}</span>
+            </a>
+          ))}
+        </div>
+        
+        <h3 className="text-xl font-semibold mb-4 text-center text-gray-800">
+          Credit Building Tools
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {creditBuildingLinks.map((tool, index) => (
+            <a
+              key={index}
+              href={tool.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${tool.color} text-white rounded-lg p-4 transition-transform hover:scale-105 flex flex-col items-center text-center space-y-2`}
+            >
+              <tool.icon className="h-6 w-6 mb-1" />
+              <span className="font-semibold">{tool.name}</span>
+              <span className="text-sm opacity-90">{tool.description}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      {/* Existing Chat Interface */}
       <motion.div 
         className="bg-white rounded-lg shadow-xl overflow-hidden"
         initial={{ opacity: 0, y: 20 }}

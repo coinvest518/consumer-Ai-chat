@@ -373,114 +373,51 @@ app.post('/api/chat-history/save', async (req, res) => {
   }
 });
 
-// Stripe payment endpoints
-app.post('/api/create-checkout-session', async (req: Request, res: Response) => {
+// Replace the checkout session endpoint with payment link endpoint
+app.post('/api/verify-payment', async (req: Request, res: Response) => {
   try {
-    const { userId, email, return_path } = req.body;
+    const { userId, email } = req.body;
     
-    // Determine the success URL based on the provided return path
-    const successUrl = `${process.env.STRIPE_SUCCESS_URL || 'https://consumer-ai.vercel.app/thank-you'}?session_id={CHECKOUT_SESSION_ID}`;
-    const baseUrl = 'https://consumer-ai.vercel.app';
-    const cancelUrl = return_path 
-      ? `${baseUrl}${return_path}`
-      : process.env.STRIPE_CANCEL_URL || `${baseUrl}/dashboard`;
+    // Get current user metrics
+    const currentMetrics = await collections.userMetricsCollection.findOne({ userId }) || {
+      dailyLimit: 5,
+      chatsUsed: 0,
+      isPro: false,
+      lastUpdated: new Date().toISOString()
+    };
     
-    console.log('Creating checkout session for user:', {
-      userId,
-      email,
-      return_path,
-      successUrl,
-      cancelUrl
-    });
-    
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        userId: userId || 'anonymous',
-        email: email || '',
-        return_path: return_path || '/dashboard',
-        source: req.headers.referer || 'unknown'
+    // Update user metrics - add 50 more credits
+    await collections.userMetricsCollection.updateOne(
+      { userId },
+      { 
+        $set: {
+          dailyLimit: currentMetrics.dailyLimit + 50,
+          lastPurchase: new Date().toISOString(),
+          lastUpdated: new Date().toISOString()
+        }
       },
-      mode: 'payment',
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
-
-    res.json({ url: session.url });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    res.status(500).json({ error: 'Failed to create checkout session' });
-  }
-});
-
-app.get('/api/verify-payment/:sessionId', async (req: Request, res: Response) => {
-  try {
-    const { sessionId } = req.params;
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+      { upsert: true }
+    );
     
-    if (session.payment_status === 'paid') {
-      // Get user ID from metadata if available
-      const metadataUserId = session.metadata?.userId;
-      const customerId = session.customer as string;
-      const customerEmail = session.customer_details?.email;
-      
-      // Use metadata userId first, then customer ID, then email
-      const userId = metadataUserId || customerId || customerEmail;
-      
-      // Get current user metrics
-      const currentMetrics = await collections.userMetricsCollection.findOne({ userId }) || {
-        dailyLimit: 5,
-        chatsUsed: 0,
-        isPro: false,
-        lastUpdated: new Date().toISOString()
-      };
-      
-      // Update user metrics - add 50 more credits instead of Pro upgrade
-      await collections.userMetricsCollection.updateOne(
-        { userId },
-        { 
-          $set: {
-            // Add 50 to the daily limit
-            dailyLimit: currentMetrics.dailyLimit + 50,
-            lastPurchase: new Date().toISOString(),
-            lastUpdated: new Date().toISOString()
-          }
-        },
-        { upsert: true }
-      );
-      
-      // Create a purchase record
-      await collections.chatHistoryCollection.insertOne({
-        userId,
-        type: 'purchase',
-        credits: 50,
-        amount: 9.99,
-        stripeSessionId: sessionId,
-        timestamp: new Date().toISOString()
-      });
-      
-      res.json({
-        paid: true,
-        userId,
-        customerEmail,
-        customerId,
-        creditsAdded: 50,
-        newLimit: currentMetrics.dailyLimit + 50
-      });
-    } else {
-      res.json({
-        paid: false
-      });
-    }
+    // Create a purchase record
+    await collections.chatHistoryCollection.insertOne({
+      userId,
+      type: 'purchase',
+      credits: 50,
+      amount: 9.99, // Fixed price for 50 credits
+      timestamp: new Date().toISOString()
+    });
+    
+    res.json({
+      success: true,
+      userId,
+      customerEmail: email,
+      creditsAdded: 50,
+      newLimit: currentMetrics.dailyLimit + 50
+    });
   } catch (error) {
-    console.error('Error verifying payment:', error);
-    res.status(500).json({ error: 'Failed to verify payment' });
+    console.error('Error processing payment:', error);
+    res.status(500).json({ error: 'Failed to process payment' });
   }
 });
 
@@ -646,6 +583,63 @@ app.post('/api/emails/schedule', async (req, res) => {
   } catch (error) {
     console.error('Error scheduling email:', error);
     res.status(500).json({ error: 'Failed to schedule email' });
+  }
+});
+
+// Add webhook endpoint for Stripe events
+app.post('/api/stripe-webhook', async (req: Request, res: Response) => {
+  const sig = req.headers['stripe-signature'];
+  
+  try {
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      sig as string,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+    
+    // Handle successful payment
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const userId = session.metadata?.userId;
+      const email = session.metadata?.email;
+      
+      if (userId) {
+        // Get current metrics
+        const currentMetrics = await collections.userMetricsCollection.findOne({ userId }) || {
+          dailyLimit: 5,
+          chatsUsed: 0,
+          isPro: false,
+          lastUpdated: new Date().toISOString()
+        };
+        
+        // Update metrics
+        await collections.userMetricsCollection.updateOne(
+          { userId },
+          { 
+            $set: {
+              dailyLimit: currentMetrics.dailyLimit + 50,
+              lastPurchase: new Date().toISOString(),
+              lastUpdated: new Date().toISOString()
+            }
+          },
+          { upsert: true }
+        );
+        
+        // Record purchase
+        await collections.chatHistoryCollection.insertOne({
+          userId,
+          type: 'purchase',
+          credits: 50,
+          amount: 9.99,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+    
+    res.json({ received: true });
+  } catch (err: any) {
+    console.error('Webhook error:', err);
+    res.status(400).send(`Webhook Error: ${err.message}`);
   }
 });
 

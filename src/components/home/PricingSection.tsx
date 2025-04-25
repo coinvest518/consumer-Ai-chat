@@ -5,10 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { API_BASE_URL } from "@/lib/config";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PricingSection() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const freePlanFeatures = [
     "5 questions per day",
@@ -26,45 +28,18 @@ export default function PricingSection() {
     "Web, mobile and email access",
   ];
 
-  const handleProUpgrade = async () => {
+  const handlePayment = () => {
     try {
       setIsLoading(true);
-      
-      // Create user data to track this payment
-      const userData = {
-        userId: user?.id || 'anonymous',
-        email: user?.email || '',
-        // Include a return_path to properly handle where to redirect after payment
-        return_path: '/dashboard'
-      };
-      
-      // Call our backend to create a Stripe checkout session
-      const response = await fetch(`${API_BASE_URL}/create-checkout-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-      
-      const { url } = await response.json();
-      
-      // Log analytics event (if you have analytics set up)
-      console.log('Payment flow initiated', {
-        userId: userData.userId,
-        timestamp: new Date().toISOString(),
-        source: 'pricing_section'
-      });
-      
-      // Navigate to Stripe Checkout
-      window.location.href = url;
+      // Redirect to the fixed Stripe payment link
+      window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU';
     } catch (error) {
-      console.error('Error creating checkout session:', error);
-      // Show error message to user (you could implement a toast notification here)
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to redirect to payment page",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -149,7 +124,7 @@ export default function PricingSection() {
               </p>
               <Button
                 className="mt-8 w-full"
-                onClick={handleProUpgrade}
+                onClick={handlePayment}
                 disabled={isLoading}
               >
                 {isLoading ? 'Processing...' : 'Upgrade to Pro'}

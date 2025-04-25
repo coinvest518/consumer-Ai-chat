@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 import ChatList from '../components/ChatList';
 import { useChat } from '../hooks/useChat';
 import { API_BASE_URL } from "@/lib/config";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatHistory {
   _id?: string;
@@ -35,6 +36,7 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const { chatSessions } = useChat();
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
+  const { toast } = useToast();
   const [metrics, setMetrics] = useState({
     dailyLimit: 5,
     chatsUsed: 0,
@@ -106,45 +108,18 @@ const Dashboard = () => {
     }
   };
 
-  const handleProUpgrade = async () => {
+  const handleGetMoreCredits = () => {
     try {
       setIsUpgradeLoading(true);
-      
-      // Create user data to track this payment
-      const userData = {
-        userId: user?.id || 'anonymous',
-        email: user?.email || '',
-        // Include a return_path to know where to redirect after payment
-        return_path: '/dashboard'
-      };
-      
-      // Call our backend to create a Stripe checkout session
-      const response = await fetch(`${API_BASE_URL}/create-checkout-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-      
-      const { url } = await response.json();
-      
-      // Log analytics event (if you have analytics set up)
-      console.log('Payment flow initiated', {
-        userId: userData.userId,
-        timestamp: new Date().toISOString(),
-        source: 'dashboard'
-      });
-      
-      // Navigate to Stripe Checkout
-      window.location.href = url;
+      // Redirect to the fixed Stripe payment link
+      window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU';
     } catch (error) {
-      console.error('Error creating checkout session:', error);
-      setError('Failed to initiate payment process. Please try again later.');
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to redirect to payment page",
+        variant: "destructive"
+      });
     } finally {
       setIsUpgradeLoading(false);
     }
@@ -205,7 +180,7 @@ const Dashboard = () => {
                     <Button 
                       variant="outline" 
                       className="w-full"
-                      onClick={handleProUpgrade}
+                      onClick={handleGetMoreCredits}
                       disabled={isUpgradeLoading}
                     >
                       {isUpgradeLoading ? 'Processing...' : 'Get 50 More Credits ($9.99)'}
