@@ -3,8 +3,13 @@ import { CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import { API_BASE_URL } from "@/lib/config";
 
 export default function PricingSection() {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+
   const freePlanFeatures = [
     "5 questions per day",
     "Basic legal information",
@@ -20,6 +25,50 @@ export default function PricingSection() {
     "Priority response times",
     "Web, mobile and email access",
   ];
+
+  const handleProUpgrade = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Create user data to track this payment
+      const userData = {
+        userId: user?.id || 'anonymous',
+        email: user?.email || '',
+        // Include a return_path to properly handle where to redirect after payment
+        return_path: '/dashboard'
+      };
+      
+      // Call our backend to create a Stripe checkout session
+      const response = await fetch(`${API_BASE_URL}/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+      
+      const { url } = await response.json();
+      
+      // Log analytics event (if you have analytics set up)
+      console.log('Payment flow initiated', {
+        userId: userData.userId,
+        timestamp: new Date().toISOString(),
+        source: 'pricing_section'
+      });
+      
+      // Navigate to Stripe Checkout
+      window.location.href = url;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      // Show error message to user (you could implement a toast notification here)
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <section id="pricing" className="py-16 bg-white">
@@ -100,9 +149,10 @@ export default function PricingSection() {
               </p>
               <Button
                 className="mt-8 w-full"
-                onClick={() => window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU'}
+                onClick={handleProUpgrade}
+                disabled={isLoading}
               >
-                Upgrade to Pro
+                {isLoading ? 'Processing...' : 'Upgrade to Pro'}
               </Button>
             </div>
             <div className="pt-6 pb-8 px-6">

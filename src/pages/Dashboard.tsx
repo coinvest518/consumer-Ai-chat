@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 import ChatList from '../components/ChatList';
 import { useChat } from '../hooks/useChat';
+import { API_BASE_URL } from "@/lib/config";
 
 interface ChatHistory {
   _id?: string;
@@ -33,6 +34,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { chatSessions } = useChat();
+  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -80,6 +82,50 @@ const Dashboard = () => {
       navigate('/', { replace: true });
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  };
+
+  const handleProUpgrade = async () => {
+    try {
+      setIsUpgradeLoading(true);
+      
+      // Create user data to track this payment
+      const userData = {
+        userId: user?.id || 'anonymous',
+        email: user?.email || '',
+        // Include a return_path to know where to redirect after payment
+        return_path: '/dashboard'
+      };
+      
+      // Call our backend to create a Stripe checkout session
+      const response = await fetch(`${API_BASE_URL}/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+      
+      const { url } = await response.json();
+      
+      // Log analytics event (if you have analytics set up)
+      console.log('Payment flow initiated', {
+        userId: userData.userId,
+        timestamp: new Date().toISOString(),
+        source: 'dashboard'
+      });
+      
+      // Navigate to Stripe Checkout
+      window.location.href = url;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      setError('Failed to initiate payment process. Please try again later.');
+    } finally {
+      setIsUpgradeLoading(false);
     }
   };
 
@@ -138,9 +184,10 @@ const Dashboard = () => {
                     <Button 
                       variant="outline" 
                       className="w-full"
-                      onClick={() => window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU'}
+                      onClick={handleProUpgrade}
+                      disabled={isUpgradeLoading}
                     >
-                      Upgrade to Pro
+                      {isUpgradeLoading ? 'Processing...' : 'Upgrade to Pro'}
                     </Button>
                   </div>
                 </div>

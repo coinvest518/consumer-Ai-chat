@@ -5,10 +5,12 @@ import { CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ThankYou = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -23,9 +25,23 @@ const ThankYou = () => {
 
     const verifyPayment = async () => {
       try {
+        // First verify payment with our API
         const result = await api.verifyPayment(sessionId);
+        
         if (result.paid) {
           setStatus('success');
+          
+          // If the user is not authenticated, redirect after a delay
+          if (!user) {
+            setTimeout(() => {
+              navigate('/login', { 
+                state: { 
+                  message: 'Please log in to access your Pro features',
+                  paymentSuccess: true
+                } 
+              });
+            }, 3000);
+          }
         } else {
           setStatus('error');
           setErrorMessage('Payment verification failed');
@@ -38,7 +54,7 @@ const ThankYou = () => {
     };
 
     verifyPayment();
-  }, [searchParams]);
+  }, [searchParams, user, navigate]);
 
   if (status === 'loading') {
     return (
@@ -99,13 +115,23 @@ const ThankYou = () => {
             <CheckCircle className="h-8 w-8 text-green-500 mb-4" />
             <h1 className="text-2xl font-bold text-gray-900">Thank You for Your Purchase!</h1>
             
-            <p className="mt-4 text-sm text-gray-600 mb-8">
+            <p className="mt-4 text-sm text-gray-600">
               Your Pro account has been activated. You now have unlimited access to Consumer AI.
             </p>
+            
+            {!user && (
+              <p className="mt-2 text-sm text-amber-600">
+                You'll be redirected to the login page shortly to access your Pro features.
+              </p>
+            )}
 
-            <Button asChild>
-              <Link to="/chat">Start Chatting Now</Link>
-            </Button>
+            <div className="mt-8">
+              <Button asChild className="w-full">
+                <Link to={user ? "/chat" : "/login"}>
+                  {user ? "Start Chatting Now" : "Log In to Continue"}
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

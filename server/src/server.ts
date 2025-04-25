@@ -125,24 +125,59 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
       });
     }
 
-    console.log('Sending request to Langflow:', {
-      url: process.env.LANGFLOW_API_URL,
-      message,
-      sessionId
-    });
-
-    const payload = {
-      input_value: message,
-      output_type: "chat",
-      input_type: "chat",
-      session_id: sessionId || "user_1"
-    };
-
-    // Add timeout of 60 seconds and retry logic
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
-
+    // Use the imported callLangflowAPI function for API calls
     try {
+      // First attempt with the callLangflowAPI helper
+      const aiResponse: AIResponse = await callLangflowAPI(message, sessionId);
+      
+      // Create a more standard API response format
+      const response: APIResponse = {
+        result: aiResponse.text,
+        response: aiResponse.text,
+        message: "Success"
+      };
+      
+      // Update metrics after successful response
+      const updatedMetrics = {
+        dailyLimit: currentMetrics.dailyLimit,
+        chatsUsed: currentMetrics.chatsUsed + 1,
+        isPro: currentMetrics.isPro,
+        lastUpdated: new Date().toISOString()
+      };
+
+      await collections.userMetricsCollection.updateOne(
+        { userId: currentMetrics.userId || 'default' },
+        { $set: updatedMetrics },
+        { upsert: true }
+      );
+
+      return res.json({ 
+        text: response.response,
+        chatsUsed: updatedMetrics.chatsUsed,
+        dailyLimit: updatedMetrics.dailyLimit,
+        remaining: updatedMetrics.dailyLimit - updatedMetrics.chatsUsed
+      });
+    } catch (error) {
+      console.error('LangflowAPI error, falling back to direct API call:', error);
+      
+      // Fall back to direct API call if the helper fails
+      console.log('Sending request to Langflow:', {
+        url: process.env.LANGFLOW_API_URL,
+        message,
+        sessionId
+      });
+
+      const payload = {
+        input_value: message,
+        output_type: "chat",
+        input_type: "chat",
+        session_id: sessionId || "user_1"
+      };
+
+      // Add timeout of 60 seconds and retry logic
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+
       const response = await fetch(process.env.LANGFLOW_API_URL!, {
         method: 'POST',
         headers: {
@@ -212,10 +247,6 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
         dailyLimit: updatedMetrics.dailyLimit,
         remaining: updatedMetrics.dailyLimit - updatedMetrics.chatsUsed
       });
-
-    } catch (error) {
-      console.error('Server error:', error);
-      return res.status(500).json({ error: 'Internal server error' });
     }
   } catch (error) {
     console.error('Server error:', error);
@@ -304,6 +335,23 @@ app.post('/api/chat-history/save', async (req, res) => {
 // Stripe payment endpoints
 app.post('/api/create-checkout-session', async (req: Request, res: Response) => {
   try {
+    const { userId, email, return_path } = req.body;
+    
+    // Determine the success URL based on the provided return path
+    const successUrl = `${process.env.STRIPE_SUCCESS_URL || 'https://consumer-ai.vercel.app/thank-you'}?session_id={CHECKOUT_SESSION_ID}`;
+    const baseUrl = 'https://consumer-ai.vercel.app';
+    const cancelUrl = return_path 
+      ? `${baseUrl}${return_path}`
+      : process.env.STRIPE_CANCEL_URL || `${baseUrl}/dashboard`;
+    
+    console.log('Creating checkout session for user:', {
+      userId,
+      email,
+      return_path,
+      successUrl,
+      cancelUrl
+    });
+    
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -312,9 +360,15 @@ app.post('/api/create-checkout-session', async (req: Request, res: Response) => 
           quantity: 1,
         },
       ],
+      metadata: {
+        userId: userId || 'anonymous',
+        email: email || '',
+        return_path: return_path || '/dashboard',
+        source: req.headers.referer || 'unknown'
+      },
       mode: 'payment',
-      success_url: `${process.env.STRIPE_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: process.env.STRIPE_CANCEL_URL,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
     });
 
     res.json({ url: session.url });
@@ -330,12 +384,17 @@ app.get('/api/verify-payment/:sessionId', async (req: Request, res: Response) =>
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     
     if (session.payment_status === 'paid') {
-      // Update user metrics to Pro
+      // Get user ID from metadata if available
+      const metadataUserId = session.metadata?.userId;
       const customerId = session.customer as string;
       const customerEmail = session.customer_details?.email;
       
+      // Use metadata userId first, then customer ID, then email
+      const userId = metadataUserId || customerId || customerEmail;
+      
+      // Update user metrics to Pro
       await collections.userMetricsCollection.updateOne(
-        { userId: customerId || customerEmail },
+        { userId },
         { 
           $set: {
             isPro: true,
@@ -348,6 +407,7 @@ app.get('/api/verify-payment/:sessionId', async (req: Request, res: Response) =>
       
       res.json({
         paid: true,
+        userId,
         customerEmail,
         customerId
       });
