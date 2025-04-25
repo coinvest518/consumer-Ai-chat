@@ -12,7 +12,8 @@ export const API_BASE_URL = import.meta.env.PROD
  */
 console.log('Environment:', {
   isProd: import.meta.env.PROD,
-  apiBaseUrl: API_BASE_URL,
+  baseUrl: API_BASE_URL,
+  deploymentUrl: import.meta.env.BASE_URL,
   hasSupabaseUrl: !!import.meta.env.VITE_SUPABASE_URL,
   hasAstraToken: !!import.meta.env.VITE_ASTRA_DB_APPLICATION_TOKEN,
 });

@@ -26,16 +26,28 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://consumer-ai.vercel.app'
+  'https://consumer-ai.vercel.app',
+  'https://consumer-ai-chat.vercel.app',
+  'https://consumer-ai-chat-git-main.vercel.app'
 ];
 
+// More permissive CORS setup for Vercel deployments
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) {
+      console.log('Allowing request with no origin');
+      return callback(null, true);
     }
+    
+    // Allow any Vercel deployment
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+      console.log('Allowing origin:', origin);
+      return callback(null, true);
+    }
+    
+    console.log('CORS blocked origin:', origin);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
@@ -401,10 +413,27 @@ app.get('/api/chat/:chatId', async (req, res) => {
   }
 });
 
+// Add a debug route to help identify if the server is running
+app.get('/api/debug', (req, res) => {
+  res.json({
+    status: 'Server is running',
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+    headers: req.headers,
+    vercelInfo: {
+      isVercel: !!process.env.VERCEL,
+      region: process.env.VERCEL_REGION,
+      environment: process.env.VERCEL_ENV
+    }
+  });
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log('Environment check:', {
     hasLangflowUrl: !!process.env.LANGFLOW_API_URL,
-    hasLangflowKey: !!process.env.LANGFLOW_API_KEY
+    hasLangflowKey: !!process.env.LANGFLOW_API_KEY,
+    env: process.env.NODE_ENV,
+    isVercel: !!process.env.VERCEL
   });
 }); 

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Health Check</title>
+</head>
+<body>
+  <h1>Static Assets Working</h1>
+  <p>If you can see this page, the static portion of your Vercel deployment is working correctly.</p>
+  <p>Current time: <span id="time"></span></p>
+  
+  <h2>API Status</h2>
+  <div id="api-status">Checking API...</div>
+  
+  <script>
+    // Display current time
+    document.getElementById('time').textContent = new Date().toISOString();
+    
+    // Check API health
+    fetch('/api/debug')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('api-status').innerHTML = 
+          `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      })
+      .catch(error => {
+        document.getElementById('api-status').innerHTML = 
+          `<p style="color: red">Error: ${error.message}</p>`;
+      });
+  </script>
+</body>
+</html> 
