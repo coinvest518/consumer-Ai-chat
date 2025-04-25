@@ -20,12 +20,17 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Proxy API requests to the local Express server during development
       '/api': {
         target: 'http://localhost:5001',
         changeOrigin: true,
         secure: false,
       }
     }
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: true
   },
   envPrefix: 'VITE_'
 }); 

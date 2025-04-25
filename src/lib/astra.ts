@@ -1,7 +1,7 @@
 import { DataAPIClient } from '@datastax/astra-db-ts';
 
-const ASTRA_TOKEN = import.meta.env.VITE_ASTRA_TOKEN;
-const ASTRA_ENDPOINT = import.meta.env.VITE_ASTRA_ENDPOINT;
+const ASTRA_TOKEN = import.meta.env.VITE_ASTRA_DB_APPLICATION_TOKEN;
+const ASTRA_ENDPOINT = import.meta.env.VITE_ASTRA_DB_ENDPOINT;
 const FLOW_ID = import.meta.env.VITE_FLOW_ID;
 
 // Initialize the client

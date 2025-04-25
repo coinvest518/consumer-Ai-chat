@@ -6,7 +6,7 @@ dotenv.config();
 // Get Langflow API details from environment variables
 const LANGFLOW_API_URL = process.env.LANGFLOW_API_URL?.trim();
 const LANGFLOW_API_KEY = process.env.LANGFLOW_API_KEY?.trim();
-const FLOW_ID = process.env.FLOW_ID?.trim();
+const FLOW_ID = "d2ec4675-eb79-4511-be23-85dad6279573";
 
 // Define AIResponse interface here to avoid import issues
 export interface AIResponse {
