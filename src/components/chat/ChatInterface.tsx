@@ -6,10 +6,14 @@ import { useToast } from "@/hooks/use-toast";
 import ChatMessage from "./ChatMessage";
 import { useChat } from "@/hooks/useChat";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { Message } from "@/lib/types";
 
 interface ChatInterfaceProps {
+  messages: Message[];
   onSendMessage: (message: string) => Promise<void>;
-  showProgress: boolean;
+  isLoading: boolean;
+  showProgress?: boolean;
 }
 
 interface StepIndicator {
@@ -40,12 +44,10 @@ const AI_STEPS: Record<string, StepIndicator> = {
   }
 };
 
-export default function ChatInterface() {
+export default function ChatInterface({ messages, onSendMessage, isLoading, showProgress }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
   const { 
-    messages, 
     sendMessage, 
-    isLoading, 
     error,     // Add usage for error
     chatLimits,
     clearChat  // Add usage for clearChat
@@ -54,6 +56,7 @@ export default function ChatInterface() {
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -88,6 +91,7 @@ export default function ChatInterface() {
       title: "Chat Cleared",
       description: "Your chat history has been cleared"
     });
+    navigate('/dashboard');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,7 +115,7 @@ export default function ChatInterface() {
       setProgress(66);
       
       // Send actual message
-      await sendMessage(messageText);
+      await onSendMessage(messageText);
       
       setProgress(100);
       setCurrentStep(null);
@@ -150,7 +154,7 @@ export default function ChatInterface() {
           <Button 
             variant="default" 
             className="mt-2"
-            onClick={() => window.location.href = '/pricing'}
+            onClick={() => window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU'}
           >
             Upgrade to Pro for Unlimited Access
           </Button>
@@ -158,6 +162,8 @@ export default function ChatInterface() {
       </div>
     );
   };
+
+  console.log("ChatInterface received messages:", messages);
 
   return (
     <div className="max-w-3xl mx-auto relative">
@@ -190,28 +196,21 @@ export default function ChatInterface() {
 
         <div className="h-96 p-4 overflow-y-auto bg-gray-50 space-y-4" id="chat-container">
           {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-gray-400 text-center px-4">
-              <div>
-                <p className="text-lg font-medium">Welcome to ConsumerAI!</p>
-                <p className="mt-2">Ask me anything about consumer protection laws, credit reports, debt collection, and more.</p>
-              </div>
-            </div>
+            <div className="text-center text-gray-500">No messages yet</div>
           ) : (
-            <>
-              {messages.map((message, index) => (
-                <ChatMessage key={index} message={message} />
-              ))}
-              {currentStep && (
-                <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm text-gray-600">
-                    {currentStep === 'understanding' && "Understanding your question..."}
-                    {currentStep === 'processing' && "Processing information..."}
-                    {currentStep === 'generating' && "Generating response..."}
-                  </span>
-                </div>
-              )}
-            </>
+            messages.map((message, index) => (
+              <ChatMessage key={message.id || index} message={message} />
+            ))
+          )}
+          {currentStep && (
+            <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm text-gray-600">
+                {currentStep === 'understanding' && "Understanding your question..."}
+                {currentStep === 'processing' && "Processing information..."}
+                {currentStep === 'generating' && "Generating response..."}
+              </span>
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>

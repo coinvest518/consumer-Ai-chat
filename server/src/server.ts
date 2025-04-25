@@ -4,6 +4,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { DataAPIClient } from '@datastax/astra-db-ts';
 import { callLangflowAPI, type AIResponse } from '../langflow';
+import Stripe from 'stripe';
 
 // Define simple response type
 interface APIResponse {
@@ -15,7 +16,12 @@ interface APIResponse {
 config();
 
 const app = express();
-const port = process.env.PORT || 5001;
+const port = process.env.PORT || 3000;
+
+// Initialize Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-03-31.basil'
+});
 
 app.use(cors());
 app.use(express.json());
@@ -245,16 +251,137 @@ app.post('/api/user-metrics/update', async (req, res) => {
 // Save chat history
 app.post('/api/chat-history/save', async (req, res) => {
   try {
+    const { userId, messages } = req.body;
+    
+    if (!userId || !messages) {
+      return res.status(400).json({ error: 'userId and messages are required' });
+    }
+
     const chatData = {
-      ...req.body,
-      timestamp: Date.now()
+      userId,
+      messages,
+      title: messages[messages.length - 1]?.text?.slice(0, 50) || 'New Chat',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     
     await collections.chatHistoryCollection.insertOne(chatData);
-    res.json({ success: true });
+    res.json({ success: true, chatData });
   } catch (error) {
     console.error('Error saving chat:', error);
     res.status(500).json({ error: 'Failed to save chat' });
+  }
+});
+
+// Stripe payment endpoints
+app.post('/api/create-checkout-session', async (req: Request, res: Response) => {
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${process.env.STRIPE_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: process.env.STRIPE_CANCEL_URL,
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+app.get('/api/verify-payment/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    if (session.payment_status === 'paid') {
+      // Update user metrics to Pro
+      const customerId = session.customer as string;
+      const customerEmail = session.customer_details?.email;
+      
+      await collections.userMetricsCollection.updateOne(
+        { userId: customerId || customerEmail },
+        { 
+          $set: {
+            isPro: true,
+            dailyLimit: 1000, // Set a high limit for Pro users
+            lastUpdated: new Date().toISOString()
+          }
+        },
+        { upsert: true }
+      );
+      
+      res.json({
+        paid: true,
+        customerEmail,
+        customerId
+      });
+    } else {
+      res.json({
+        paid: false
+      });
+    }
+  } catch (error) {
+    console.error('Error verifying payment:', error);
+    res.status(500).json({ error: 'Failed to verify payment' });
+  }
+});
+
+// Add this endpoint
+app.get('/api/chat-history/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const cursor = await collections.chatHistoryCollection.find({ userId });
+    const chatHistory = await cursor.toArray();
+    
+    if (!chatHistory || chatHistory.length === 0) {
+      return res.json([]);
+    }
+
+    res.json(chatHistory);
+  } catch (error) {
+    console.error('Error fetching chat history:', error);
+    res.status(500).json({ error: 'Failed to fetch chat history' });
+  }
+});
+
+// Add this endpoint
+app.get('/api/chat/:chatId', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    if (!chatId) {
+      return res.status(400).json({ error: 'chatId is required' });
+    }
+
+    // Find by _id in Astra
+    const chat = await collections.chatHistoryCollection.findOne({ 
+      _id: chatId 
+    });
+
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    // Return the full chat with messages
+    res.json({
+      id: chat._id,
+      messages: chat.messages || [],
+      timestamp: chat.timestamp
+    });
+  } catch (error) {
+    console.error('Error fetching chat:', error);
+    res.status(500).json({ error: 'Failed to fetch chat' });
   }
 });
 

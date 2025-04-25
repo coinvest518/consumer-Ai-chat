@@ -1,9 +1,15 @@
-import { Link } from "wouter";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { PlayCircle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useState } from "react";
+import { VideoModal } from "@/components/ui/VideoModal";
 
 export default function HeroSection() {
+  const { user } = useAuth();
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  
   return (
     <section className="relative overflow-hidden pt-16 pb-24 sm:pb-32">
       {/* Background gradient and patterns */}
@@ -42,8 +48,11 @@ export default function HeroSection() {
                   whileHover={{ scale: 1.05 }}
                   transition={{ type: "spring", stiffness: 400, damping: 10 }}
                 >
-                  <Link className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-primary/90 md:py-4 md:text-lg md:px-10" href="/chat">
-                    Start Chatting Free
+                  <Link 
+                    to={user ? "/chat" : "/login"} 
+                    className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-primary/90 md:py-4 md:text-lg md:px-10"
+                  >
+                    {user ? "Start Chatting" : "Start Chatting Free"}
                   </Link>
                 </motion.div>
                 <div className="mt-3 sm:mt-0 sm:ml-3">
@@ -176,10 +185,21 @@ export default function HeroSection() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 1.5 }}
       >
-        <Button variant="ghost" size="sm" className="flex items-center gap-2 text-primary">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="flex items-center gap-2 text-primary hover:bg-primary/10"
+          onClick={() => setIsVideoOpen(true)}
+        >
           <PlayCircle className="h-4 w-4" /> Watch instruction video
         </Button>
       </motion.div>
+
+      <VideoModal
+        isOpen={isVideoOpen}
+        onClose={() => setIsVideoOpen(false)}
+        videoId="6NW2gXoezaE"
+      />
     </section>
   );
 }

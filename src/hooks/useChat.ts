@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { Message } from "@/lib/types";
+import { Message, ChatSession, ChatHistory } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from '@/lib/api';
-
-const API_BASE_URL = 'http://localhost:5001/api';
+import { API_BASE_URL } from '@/lib/config';
 
 interface ChatLimits {
   dailyLimit: number;
@@ -38,6 +37,7 @@ export function useChat() {
     chatsUsedToday: 0,
     isProUser: false
   });
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
 
   // Load messages from localStorage on mount
   useEffect(() => {
@@ -98,9 +98,10 @@ export function useChat() {
     
     try {
       await api.updateChatMetrics(user.id);
+      // Save chat history with proper structure
       await api.saveChat({
         userId: user.id,
-        messages
+        messages: messages.filter(m => m.id !== "0-ai") // Don't save welcome message
       });
     } catch (error) {
       console.error('Error updating chat metrics:', error);
@@ -233,12 +234,43 @@ export function useChat() {
     return () => clearTimeout(timer);
   }, []);
 
+  const updateMessages = useCallback((newMessages: Message[]) => {
+    console.log("Setting messages:", newMessages);
+    setMessages(newMessages);
+  }, []);
+
+  useEffect(() => {
+    const fetchChats = async () => {
+      try {
+        if (!user?.id) return;
+        const response = await api.getChatHistory(user.id);
+        // Transform the chat history into ChatSession format
+        const sessions = response.map((chat: ChatHistory) => ({
+          id: chat.id,
+          title: chat.title || 'Chat',
+          lastMessage: chat.messages[chat.messages.length - 1]?.text || '',
+          updatedAt: new Date(chat.timestamp || Date.now()),
+          messageCount: chat.messages.length,
+          messages: chat.messages
+        }));
+        setChatSessions(sessions);
+      } catch (error) {
+        console.error('Error fetching chat sessions:', error);
+        setChatSessions([]);
+      }
+    };
+    
+    fetchChats();
+  }, [user]);
+
   return {
     messages,
+    setMessages: updateMessages,
     sendMessage,
     clearChat,
     isLoading,
     error,
-    chatLimits
+    chatLimits,
+    chatSessions
   };
 }

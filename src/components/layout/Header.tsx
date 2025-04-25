@@ -3,7 +3,14 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Header() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
     <header className="border-b">
@@ -14,15 +21,33 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center gap-6">
           <Link to="/chat" className="text-gray-600 hover:text-primary">Chat</Link>
-          <Link to="/#features" className="text-gray-600 hover:text-primary">Features</Link>
-          <Link to="/#pricing" className="text-gray-600 hover:text-primary">Pricing</Link>
+          <button 
+            onClick={() => scrollToSection('features')} 
+            className="text-gray-600 hover:text-primary"
+          >
+            Features
+          </button>
+          <button 
+            onClick={() => scrollToSection('pricing')} 
+            className="text-gray-600 hover:text-primary"
+          >
+            Pricing
+          </button>
         </nav>
 
         <div className="flex items-center gap-4">
           {user ? (
-            <Link to="/chat">
-              <Button>Go to Chat</Button>
-            </Link>
+            <>
+              <Link to="/dashboard">
+                <Button variant="outline">Dashboard</Button>
+              </Link>
+              <Link to="/chat">
+                <Button>New Chat</Button>
+              </Link>
+              <Button variant="ghost" onClick={signOut}>
+                Logout
+              </Button>
+            </>
           ) : (
             <>
               <Link to="/login">

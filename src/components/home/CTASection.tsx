@@ -1,8 +1,11 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function CTASection() {
+  const { user } = useAuth();
+  
   return (
     <section className="bg-primary">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:py-16 lg:px-8 lg:flex lg:items-center lg:justify-between">
@@ -26,18 +29,18 @@ export default function CTASection() {
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <div className="inline-flex rounded-md shadow">
-            <Link href="/chat">
+            <Link to={user ? "/chat" : "/login"}>
               <Button className="px-5 py-3 text-base rounded-md font-medium bg-white text-primary hover:bg-primary-50">
-                Get started
+                {user ? "Start Chatting" : "Get started"}
               </Button>
             </Link>
           </div>
           <div className="ml-3 inline-flex rounded-md shadow">
-            <Link href="/#pricing">
+            <a href="#pricing">
               <Button variant="secondary" className="px-5 py-3 text-base rounded-md font-medium">
                 View pricing
               </Button>
-            </Link>
+            </a>
           </div>
         </motion.div>
       </div>

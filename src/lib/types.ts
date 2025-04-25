@@ -1,11 +1,11 @@
 export interface Message {
-  id: string;
+  id?: string;
   text: string;
   sender: 'user' | 'bot';
   type: 'user' | 'ai';
+  timestamp: number;
   citation?: string;
   actions?: string[];
-  timestamp: number;
 }
 
 export interface Chat {
@@ -26,4 +26,20 @@ export interface ChatSession {
   title: string;
   lastMessage: string;
   updatedAt: Date;
+  messageCount: number;
+  messages?: Message[];
+}
+
+export interface ChatHistory {
+  id: string;
+  userId: string;
+  messages: {
+    id?: string;
+    text: string;
+    sender: 'user' | 'bot';
+    type: string;
+    timestamp: number;
+  }[];
+  timestamp?: number;
+  title?: string;
 }

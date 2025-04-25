@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { CheckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { Link } from "react-router-dom";
 
 export default function PricingSection() {
   const freePlanFeatures = [
@@ -56,7 +57,7 @@ export default function PricingSection() {
                 <span className="text-4xl font-extrabold text-gray-900">$0</span>
                 <span className="text-base font-medium text-gray-500">/mo</span>
               </p>
-              <Link href="/chat">
+              <Link to="/chat">
                 <Button variant="outline" className="mt-8 w-full border-primary text-primary hover:bg-primary-50">
                   Start Chatting Free
                 </Button>
@@ -97,7 +98,10 @@ export default function PricingSection() {
                 <span className="text-4xl font-extrabold text-gray-900">$9.99</span>
                 <span className="text-base font-medium text-gray-500">/mo</span>
               </p>
-              <Button className="mt-8 w-full">
+              <Button
+                className="mt-8 w-full"
+                onClick={() => window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU'}
+              >
                 Upgrade to Pro
               </Button>
             </div>

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import { useLocation } from 'wouter';
+import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: string;
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [session, setSession] = useState<any>(null);
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Check active sessions and sets the user
@@ -82,8 +82,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Sign up successful, data:", data);
       if (data.session) {
         setUser(mapUser(data.session.user));
-        // Redirect to chat after successful signup
-        setLocation('/chat');
+        // Redirect to dashboard after successful signup
+        navigate('/dashboard');
         return { success: true };
       }
       
@@ -106,8 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Sign in successful, data:", data);
       if (data.session) {
         setUser(mapUser(data.session.user));
-        // Redirect to chat after successful login
-        setLocation('/chat');
+        // Redirect to dashboard after successful login
+        navigate('/dashboard');
         return { success: true };
       }
       
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await supabase.auth.signOut();
       console.log("Sign out successful");
-      setLocation('/'); // Redirect to home after logout
+      navigate('/'); // Redirect to home after logout
     } catch (error) {
       console.error('Error signing out:', error);
     }

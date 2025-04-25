@@ -1,39 +1,59 @@
-const API_BASE_URL = 'http://localhost:5001/api';
+import { API_BASE_URL } from './config';
 
 export const api = {
-  async getChatLimits() {
+  getChatLimits: async () => {
     const response = await fetch(`${API_BASE_URL}/user-metrics/limits`);
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error('Failed to fetch chat limits');
     }
     return response.json();
   },
 
-  async updateChatMetrics(userId: string) {
+  updateChatMetrics: async (userId: string) => {
     const response = await fetch(`${API_BASE_URL}/user-metrics/update`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId })
+      body: JSON.stringify({ userId }),
     });
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error('Failed to update chat metrics');
     }
     return response.json();
   },
 
-  async saveChat(chatData: { userId: string; messages: any[] }) {
+  saveChat: async (chatData: any) => {
     const response = await fetch(`${API_BASE_URL}/chat-history/save`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(chatData)
+      body: JSON.stringify(chatData),
     });
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
+      throw new Error('Failed to save chat');
     }
     return response.json();
-  }
+  },
+
+  verifyPayment: async (sessionId: string) => {
+    const response = await fetch(`${API_BASE_URL}/verify-payment/${sessionId}`);
+    if (!response.ok) {
+      throw new Error('Failed to verify payment');
+    }
+    return response.json();
+  },
+
+  getChatHistory: async (userId: string) => {
+    const response = await fetch(`${API_BASE_URL}/chat-history/${userId}`);
+    if (!response.ok) throw new Error('Failed to fetch chat history');
+    return response.json();
+  },
+
+  getChat: async (chatId: string) => {
+    const response = await fetch(`${API_BASE_URL}/chat/${chatId}`);
+    if (!response.ok) throw new Error('Failed to fetch chat');
+    return response.json();
+  },
 }; 

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useLocation } from 'wouter';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,7 +31,7 @@ const formSchema = z.object({
 });
 
 export function RegisterForm() {
-  const [_, navigate] = useLocation();
+  const navigate = useNavigate();
   const { signUp } = useAuth();
   
   const form = useForm<z.infer<typeof formSchema>>({

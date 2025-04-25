@@ -1,60 +1,89 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'wouter';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { fadeIn } from '@/lib/animations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { apiRequest } from '@/lib/queryClient';
+import { api } from '@/lib/api';
 import { Loader2 } from 'lucide-react';
+import ChatList from '../components/ChatList';
+import { useChat } from '../hooks/useChat';
 
 interface ChatHistory {
+  _id?: string;
   id: string;
   userId: string;
-  title: string;
-  messages: any[];
-  createdAt: string;
-  updatedAt: string;
+  messages: Array<{
+    id?: string;
+    text: string;
+    sender: string;
+    type: string;
+    timestamp: number;
+  }>;
+  timestamp?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 const Dashboard = () => {
-  const [location, navigate] = useLocation();
-  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { user, signOut, loading: authLoading } = useAuth();
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { chatSessions } = useChat();
 
   useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login', { replace: true });
+      return;
+    }
+
     const fetchChatHistory = async () => {
       try {
         if (!user) return;
 
-        // Use the API endpoint for Astra DB
-        const response = await apiRequest.get(`/api/chat-history/${user.id}`);
-        setChatHistory(response.data || []);
+        const response = await api.getChatHistory(user.id);
+        setChatHistory(response || []);
         setError(null);
       } catch (err) {
         console.error('Error fetching chat history:', err);
-        setError('Failed to load chat history');
+        setError('No chat history found. Start a new chat!');
         setChatHistory([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchChatHistory();
-  }, [user]);
+    if (user) {
+      fetchChatHistory();
+    }
+  }, [user, authLoading, navigate]);
 
-  const handleNewChat = () => {
+  const handleNewChat = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     navigate('/chat');
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/');
+  const handleChatClick = (chatId: string) => {
+    const safeId = chatId.replace(/[^a-zA-Z0-9-]/g, '');
+    navigate(`/chat/${safeId}`);
   };
 
-  if (loading) {
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await signOut();
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  if (authLoading || loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -106,7 +135,11 @@ const Dashboard = () => {
                     <span className="font-medium">Free Tier</span>
                   </div>
                   <div className="mt-4">
-                    <Button variant="outline" className="w-full">
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => window.location.href = 'https://buy.stripe.com/9AQeYP2cUcq0eA0bIU'}
+                    >
                       Upgrade to Pro
                     </Button>
                   </div>
@@ -141,7 +174,7 @@ const Dashboard = () => {
 
           <h2 className="text-2xl font-bold mb-4">Recent Chats</h2>
           
-          {chatHistory.length === 0 ? (
+          {(chatHistory.length === 0 && chatSessions.length === 0) ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center p-8">
                 <p className="text-gray-500 mb-4">You haven't started any chats yet</p>
@@ -149,23 +182,20 @@ const Dashboard = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {chatHistory.map((chat) => (
-                <Card 
-                  key={chat.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => navigate(`/chat/${chat.id}`)}
-                >
-                  <CardContent className="p-4">
-                    <h3 className="font-medium truncate">{chat.title}</h3>
-                    
-                    <p className="text-sm text-gray-500 mt-1">
-                      Last updated: {new Date(chat.updatedAt).toLocaleString()}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ChatList 
+              sessions={chatSessions.length > 0 ? chatSessions : chatHistory.map(chat => ({
+                id: chat.id,
+                title: 'Chat',
+                lastMessage: chat.messages[chat.messages.length - 1]?.text || '',
+                updatedAt: new Date(chat.timestamp || Date.now()),
+                messageCount: chat.messages.length,
+                messages: chat.messages.map(msg => ({
+                  ...msg,
+                  type: msg.type as 'user' | 'ai',
+                  sender: msg.sender as 'user' | 'bot'
+                }))
+              }))} 
+            />
           )}
         </div>
       </div>
