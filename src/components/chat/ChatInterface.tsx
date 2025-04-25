@@ -113,7 +113,6 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
       title: "Chat Cleared",
       description: "Your chat history has been cleared"
     });
-    navigate('/dashboard');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
