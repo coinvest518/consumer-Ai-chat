@@ -17,7 +17,8 @@ interface AuthContextType {
   session: any;
   signOut: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: Error }>;
-  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: Error }>;
+  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: Error; needsVerification?: boolean }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: Error }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getInitialSession();
   }, []);
 
-  const signUp = async (email: string, password: string): Promise<{ success: boolean; error?: Error }> => {
+  const signUp = async (email: string, password: string): Promise<{ success: boolean; error?: Error; needsVerification?: boolean }> => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -80,6 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       console.log("Sign up successful, data:", data);
+      
+      // Check if user needs to verify email
+      if (data.user && !data.session) {
+        return { success: true, needsVerification: true };
+      }
+      
       if (data.session) {
         setUser(mapUser(data.session.user));
         // Redirect to dashboard after successful signup
@@ -128,6 +135,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithGoogle = async (): Promise<{ success: boolean; error?: Error }> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      
+      if (error) throw error;
+      
+      console.log("Google sign in initiated");
+      return { success: true };
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      return { success: false, error: error as Error };
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -136,7 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       signOut,
       signIn,
-      signUp
+      signUp,
+      signInWithGoogle
     }}>
       {children}
     </AuthContext.Provider>

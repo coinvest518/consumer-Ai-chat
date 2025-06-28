@@ -14,7 +14,8 @@ interface APIResponse {
   message?: string;
 }
 
-config();
+// Load environment variables from the parent directory
+config({ path: '../.env' });
 
 const app = express();
 const port = process.env.PORT || 3000;
