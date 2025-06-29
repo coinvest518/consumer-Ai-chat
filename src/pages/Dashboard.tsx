@@ -6,10 +6,11 @@ import { fadeIn } from '@/lib/animations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Menu, FileText } from 'lucide-react';
 import ChatList from '../components/ChatList';
+import TemplateSidebar from '../components/TemplateSidebar';
+import TavusChatbot from '../components/TavusChatbot';
 import { useChat } from '../hooks/useChat';
-import { API_BASE_URL } from "@/lib/config";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatHistory {
@@ -36,6 +37,7 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const { chatSessions } = useChat();
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { toast } = useToast();
   const [metrics, setMetrics] = useState({
     dailyLimit: 5,
@@ -125,6 +127,36 @@ const Dashboard = () => {
     }
   };
 
+  const handleSidebarToggle = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleTemplateSelect = (template: any) => {
+    // Navigate to chat with the template pre-loaded
+    navigate('/chat', { 
+      state: { 
+        template: template,
+        templateContent: template.fullContent,
+        templateType: template.type
+      } 
+    });
+  };
+
+  const refetchMetrics = async () => {
+    try {
+      if (!user) return;
+      
+      const metricsData = await api.getChatLimits(user.id);
+      setMetrics({
+        dailyLimit: metricsData.dailyLimit || 5,
+        chatsUsed: metricsData.chatsUsed || 0,
+        remaining: (metricsData.dailyLimit || 5) - (metricsData.chatsUsed || 0)
+      });
+    } catch (err) {
+      console.error('Error fetching metrics:', err);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -149,17 +181,39 @@ const Dashboard = () => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <div className="flex gap-4">
-              <Button onClick={handleNewChat}>New Chat</Button>
-              <Button variant="outline" onClick={handleLogout}>
-                Logout
-              </Button>
+      {/* Template Sidebar */}
+      <TemplateSidebar
+        isOpen={isSidebarOpen}
+        onToggle={handleSidebarToggle}
+        onTemplateSelect={handleTemplateSelect}
+        userCredits={metrics.remaining}
+        onCreditUpdate={refetchMetrics}
+      />
+
+      <div className={`min-h-screen bg-gray-50 transition-all duration-300 ${isSidebarOpen ? 'lg:ml-96' : ''}`}>
+        <div className="p-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex justify-between items-center mb-8">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSidebarToggle}
+                  className="flex items-center gap-2"
+                >
+                  <Menu className="w-4 h-4" />
+                  <FileText className="w-4 h-4" />
+                  Templates
+                </Button>
+                <h1 className="text-3xl font-bold">Dashboard</h1>
+              </div>
+              <div className="flex gap-4">
+                <Button onClick={handleNewChat}>New Chat</Button>
+                <Button variant="outline" onClick={handleLogout}>
+                  Logout
+                </Button>
+              </div>
             </div>
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <Card>
@@ -240,7 +294,11 @@ const Dashboard = () => {
               }))} 
             />
           )}
+          </div>
         </div>
+        
+        {/* Floating Tavus Customer Support Chatbot */}
+        <TavusChatbot />
       </div>
     </motion.div>
   );

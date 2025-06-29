@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Brain, Loader2, MessageSquare } from "lucide-react";
 import { useChat } from "@/hooks/useChat";
 import { Button } from "@/components/ui/button";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
@@ -41,8 +41,23 @@ const Chat = () => {
   const { chatId } = useParams();
   const { messages, setMessages, sendMessage, isLoading } = useChat();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [initialTemplate, setInitialTemplate] = useState<any>(null);
+
+  // Check for template from navigation state
+  useEffect(() => {
+    if (location.state?.template) {
+      setInitialTemplate(location.state.template);
+      
+      // Show a notification about the template being applied
+      toast({
+        title: "Template Applied",
+        description: `"${location.state.template.name}" is ready to use`,
+      });
+    }
+  }, [location.state, toast]);
 
   // Load existing chat if chatId exists
   useEffect(() => {
@@ -103,6 +118,16 @@ const Chat = () => {
             <p className="mt-4 text-lg text-gray-500">
               Get answers to your consumer law questions instantly.
             </p>
+            {initialTemplate && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>{initialTemplate.name}</strong> template is ready to use
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  {initialTemplate.description}
+                </p>
+              </div>
+            )}
           </div>
           
           <ChatInterface 
@@ -110,6 +135,7 @@ const Chat = () => {
             onSendMessage={sendMessage}
             isLoading={isLoading}
             showProgress={true}
+            initialTemplate={initialTemplate}
           />
         </div>
       </main>

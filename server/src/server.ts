@@ -30,7 +30,9 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://consumer-ai.vercel.app',
   'https://consumer-ai-chat.vercel.app',
-  'https://consumer-ai-chat-git-main.vercel.app'
+  'https://consumer-ai-chat-git-main.vercel.app',
+  'https://consumerai.info',
+  'https://www.consumerai.info'
 ];
 
 // More permissive CORS setup for Vercel deployments
@@ -42,8 +44,8 @@ app.use(cors({
       return callback(null, true);
     }
     
-    // Allow any Vercel deployment
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+    // Allow specific origins and any Vercel deployment
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app') || origin.includes('consumerai.info')) {
       console.log('Allowing origin:', origin);
       return callback(null, true);
     }
@@ -67,12 +69,14 @@ const userMetricsCollection = db.collection('user_metrics');
 const chatHistoryCollection = db.collection('chat_history');
 const emailCollection = db.collection('emails');
 const scheduledEmailCollection = db.collection('scheduled_emails');
+const templateUsageCollection = db.collection('template_usage');
 
 const collections = {
   userMetricsCollection,
   chatHistoryCollection,
   emailCollection,
-  scheduledEmailCollection
+  scheduledEmailCollection,
+  templateUsageCollection
 };
 
 interface ChatRequest {
@@ -451,6 +455,36 @@ app.post('/api/verify-payment', async (req: Request, res: Response) => {
   }
 });
 
+// Add GET endpoint for Stripe session verification (for thank-you page)
+app.get('/api/verify-payment/:sessionId', async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+
+    // Verify with Stripe that this session was paid
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    if (session.payment_status === 'paid') {
+      res.json({
+        paid: true,
+        customerEmail: session.customer_details?.email,
+        sessionId: sessionId
+      });
+    } else {
+      res.json({
+        paid: false,
+        sessionId: sessionId
+      });
+    }
+  } catch (error) {
+    console.error('Error verifying payment session:', error);
+    res.status(500).json({ error: 'Failed to verify payment session' });
+  }
+});
+
 // Add this endpoint
 app.get('/api/chat-history/:userId', async (req, res) => {
   try {
@@ -673,6 +707,155 @@ app.post('/api/stripe-webhook', async (req: Request, res: Response) => {
   }
 });
 
+// Tavus conversation creation endpoint - matches Tavus API documentation
+app.post('/api/tavus/conversations', async (req, res) => {
+  try {
+    console.log('=== TAVUS DEBUG START ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    const { persona_id, conversation_name, conversational_context, properties } = req.body;
+
+    console.log('Environment check:', {
+      hasApiKey: !!process.env.TAVUS_API_KEY,
+      apiKeyPreview: process.env.TAVUS_API_KEY ? process.env.TAVUS_API_KEY.substring(0, 8) + '...' : 'MISSING',
+      personaId: process.env.TAVUS_PERSONA_ID,
+      replicaId: process.env.TAVUS_REPLICA_ID
+    });
+
+    if (!persona_id) {
+      console.log('ERROR: Missing persona_id in request');
+      return res.status(400).json({ error: 'persona_id is required' });
+    }
+
+    const requestBody = {
+      persona_id,
+      // Don't include replica_id since persona pb1db14ac254 has a default replica
+      conversation_name: conversation_name || 'ConsumerAI Support',
+      conversational_context: conversational_context || 'You are a helpful customer service representative for ConsumerAI, a legal AI platform helping consumers with credit disputes and debt collection issues. Help users understand our platform features, pricing, legal templates (FCRA, FDCPA), and guide them through signup or platform usage. Be professional, empathetic, and concise.',
+      properties: {
+        enable_recording: false,
+        max_call_duration: 600, // 10 minutes
+        enable_transcription: true,
+        language: 'english', // Use full language name, not ISO code
+        ...properties
+      }
+    };
+
+    console.log('Sending to Tavus API:', JSON.stringify(requestBody, null, 2));
+
+    // Try the correct Tavus API base URL from official documentation
+    const baseUrls = [
+      'https://tavusapi.com/v2/conversations',  // Official URL from Tavus documentation
+      'https://api.tavus.io/v2/conversations'   // Backup URL in case there are regional differences
+    ];
+
+    let lastError;
+    let response;
+    
+    for (const url of baseUrls) {
+      try {
+        console.log(`Attempting Tavus API call to: ${url}`);
+        
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.TAVUS_API_KEY || ''
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log(`Tavus API response status from ${url}: ${response.status}`);
+        
+        if (response.ok) {
+          // Success! Continue with normal flow
+          break;
+        } else {
+          const errorData = await response.text();
+          console.error(`Tavus API error from ${url}:`, response.status, errorData);
+          lastError = new Error(`HTTP ${response.status}: ${errorData}`);
+          continue; // Try next URL
+        }
+
+      } catch (error) {
+        console.error(`Network error with URL ${url}:`, error);
+        lastError = error;
+        continue; // Try next URL
+      }
+    }
+
+    // Check if we got a successful response from any URL
+    if (!response || !response.ok) {
+      console.error('All Tavus API URLs failed');
+      console.log('=== TAVUS DEBUG END (ERROR) ===');
+      throw lastError || new Error('All Tavus API endpoints failed');
+    }
+
+    const conversationData = await response.json();
+    console.log('Tavus conversation created successfully:', conversationData);
+    console.log('=== TAVUS DEBUG END (SUCCESS) ===');
+    res.json(conversationData);
+
+  } catch (error) {
+    console.error('Exception in Tavus endpoint:', error);
+    console.log('=== TAVUS DEBUG END (EXCEPTION) ===');
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Get Tavus conversation status
+app.get('/api/tavus/conversation/:conversationId', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    const response = await fetch(`https://tavusapi.com/v2/conversations/${conversationId}`, {
+      headers: {
+        'x-api-key': process.env.TAVUS_API_KEY || ''
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to get conversation status' });
+    }
+
+    const conversationData = await response.json();
+    res.json(conversationData);
+
+  } catch (error) {
+    console.error('Error getting Tavus conversation:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// End Tavus conversation
+app.post('/api/tavus/conversation/:conversationId/end', async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+
+    const response = await fetch(`https://tavusapi.com/v2/conversations/${conversationId}/end`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.TAVUS_API_KEY || ''
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Failed to end conversation' });
+    }
+
+    const result = await response.json();
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error ending Tavus conversation:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log('Environment check:', {
@@ -753,3 +936,157 @@ app.post('/api/debug/init-user', async (req, res) => {
     res.status(500).json({ error: 'Failed to initialize user' });
   }
 });
+
+// Template-related endpoints
+
+// Use template endpoint
+app.post('/api/templates/use', async (req, res) => {
+  try {
+    const { userId, templateId, creditCost } = req.body;
+    
+    if (!userId || !templateId || !creditCost) {
+      return res.status(400).json({ error: 'userId, templateId, and creditCost are required' });
+    }
+
+    // Get current user metrics
+    const currentMetrics = await collections.userMetricsCollection.findOne({ userId });
+    const defaultMetrics = {
+      dailyLimit: 5,
+      chatsUsed: 0,
+      isPro: false,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const userMetrics = currentMetrics ? {
+      dailyLimit: currentMetrics.dailyLimit || 5,
+      chatsUsed: currentMetrics.chatsUsed || 0,
+      isPro: currentMetrics.isPro || false,
+      lastUpdated: currentMetrics.lastUpdated || new Date().toISOString()
+    } : defaultMetrics;
+
+    // Check if user has enough credits
+    const remainingCredits = userMetrics.dailyLimit - userMetrics.chatsUsed;
+    if (remainingCredits < creditCost) {
+      return res.status(400).json({ 
+        error: 'Insufficient credits',
+        required: creditCost,
+        available: remainingCredits
+      });
+    }
+
+    // Deduct credits
+    const updatedMetrics = {
+      ...userMetrics,
+      chatsUsed: userMetrics.chatsUsed + creditCost,
+      lastUpdated: new Date().toISOString()
+    };
+
+    await collections.userMetricsCollection.updateOne(
+      { userId },
+      { $set: updatedMetrics },
+      { upsert: true }
+    );
+
+    // Log template usage
+    const templateUsage = {
+      userId,
+      templateId,
+      creditCost,
+      timestamp: new Date().toISOString(),
+      creditsRemaining: updatedMetrics.dailyLimit - updatedMetrics.chatsUsed
+    };
+
+    await collections.templateUsageCollection.insertOne(templateUsage);
+
+    res.json({
+      success: true,
+      creditsDeducted: creditCost,
+      creditsRemaining: updatedMetrics.dailyLimit - updatedMetrics.chatsUsed,
+      templateUsage
+    });
+  } catch (error) {
+    console.error('Error using template:', error);
+    res.status(500).json({ error: 'Failed to use template' });
+  }
+});
+
+// Get template usage history
+app.get('/api/templates/usage/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const usage = await collections.templateUsageCollection
+      .find({ userId })
+      .sort({ timestamp: -1 })
+      .limit(50)
+      .toArray();
+
+    res.json(usage);
+  } catch (error) {
+    console.error('Error fetching template usage:', error);
+    res.status(500).json({ error: 'Failed to fetch template usage' });
+  }
+});
+
+// Deduct credits endpoint (for general credit deduction)
+app.post('/api/user-metrics/deduct', async (req, res) => {
+  try {
+    const { userId, amount, reason } = req.body;
+    
+    if (!userId || !amount) {
+      return res.status(400).json({ error: 'userId and amount are required' });
+    }
+
+    const currentMetrics = await collections.userMetricsCollection.findOne({ userId });
+    const defaultMetrics = {
+      dailyLimit: 5,
+      chatsUsed: 0,
+      isPro: false,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const userMetrics = currentMetrics ? {
+      dailyLimit: currentMetrics.dailyLimit || 5,
+      chatsUsed: currentMetrics.chatsUsed || 0,
+      isPro: currentMetrics.isPro || false,
+      lastUpdated: currentMetrics.lastUpdated || new Date().toISOString()
+    } : defaultMetrics;
+
+    const remainingCredits = userMetrics.dailyLimit - userMetrics.chatsUsed;
+    if (remainingCredits < amount) {
+      return res.status(400).json({ 
+        error: 'Insufficient credits',
+        required: amount,
+        available: remainingCredits
+      });
+    }
+
+    const updatedMetrics = {
+      ...userMetrics,
+      chatsUsed: userMetrics.chatsUsed + amount,
+      lastUpdated: new Date().toISOString()
+    };
+
+    await collections.userMetricsCollection.updateOne(
+      { userId },
+      { $set: updatedMetrics },
+      { upsert: true }
+    );
+
+    res.json({
+      success: true,
+      creditsDeducted: amount,
+      creditsRemaining: updatedMetrics.dailyLimit - updatedMetrics.chatsUsed,
+      reason: reason || 'General usage'
+    });
+  } catch (error) {
+    console.error('Error deducting credits:', error);
+    res.status(500).json({ error: 'Failed to deduct credits' });
+  }
+});
+
+// Replace the checkout session endpoint with payment link endpoint

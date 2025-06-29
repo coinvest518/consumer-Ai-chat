@@ -9,7 +9,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Message } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { API_BASE_URL } from "@/lib/config";
 import { 
   Dialog, 
   DialogTrigger, 
@@ -28,6 +27,7 @@ interface ChatInterfaceProps {
   onSendMessage: (message: string) => Promise<void>;
   isLoading: boolean;
   showProgress?: boolean;
+  initialTemplate?: any;
 }
 
 interface StepIndicator {
@@ -58,7 +58,7 @@ const AI_STEPS: Record<string, StepIndicator> = {
   }
 };
 
-export default function ChatInterface({ messages, onSendMessage, isLoading, showProgress }: ChatInterfaceProps) {
+export default function ChatInterface({ messages, onSendMessage, isLoading, showProgress, initialTemplate }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { 
@@ -78,6 +78,13 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
     subject: "",
     body: ""
   });
+
+  // Initialize input with template content if provided
+  useEffect(() => {
+    if (initialTemplate && initialTemplate.fullContent && !inputValue) {
+      setInputValue(initialTemplate.fullContent);
+    }
+  }, [initialTemplate, inputValue]);
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
