@@ -1,11 +1,11 @@
 /**
  * Base API URL for backend requests
  * In production, use relative path
- * In development, use localhost:5001
+ * In development, use localhost:3000
  */
 export const API_BASE_URL = import.meta.env.PROD 
   ? '/api' 
-  : 'http://localhost:5001/api';
+  : 'http://localhost:3000/api';
 
 /**
  * Log environment state during initialization

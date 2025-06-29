@@ -41,7 +41,9 @@ export function useChat() {
 
   // Load messages from localStorage on mount
   useEffect(() => {
-    const savedMessages = localStorage.getItem("chat-messages");
+    if (!user?.id) return;
+    
+    const savedMessages = localStorage.getItem(`chat-messages-${user.id}`);
     if (savedMessages) {
       try {
         const parsedMessages: Message[] = JSON.parse(savedMessages).map((msg: any) => ({
@@ -51,17 +53,17 @@ export function useChat() {
         setMessages(parsedMessages);
       } catch (e) {
         console.error("Failed to parse saved messages:", e);
-        localStorage.removeItem("chat-messages");
+        localStorage.removeItem(`chat-messages-${user.id}`);
       }
     }
-  }, []);
+  }, [user]);
 
   // Save messages to localStorage when they change
   useEffect(() => {
-    if (messages.length > 1) {
-      localStorage.setItem("chat-messages", JSON.stringify(messages));
+    if (messages.length > 1 && user?.id) {
+      localStorage.setItem(`chat-messages-${user.id}`, JSON.stringify(messages));
     }
-  }, [messages]);
+  }, [messages, user]);
 
   // Fetch chat limits on mount
   useEffect(() => {
@@ -69,7 +71,9 @@ export function useChat() {
 
     const fetchLimits = async () => {
       try {
-        const metrics = await api.getChatLimits();
+        console.log('Fetching chat limits for user:', user.id);
+        const metrics = await api.getChatLimits(user.id);
+        console.log('Received metrics:', metrics);
         if (metrics) {
           setChatLimits({
             dailyLimit: metrics.dailyLimit || 5,
@@ -79,10 +83,17 @@ export function useChat() {
         }
       } catch (error) {
         console.error('Failed to fetch chat limits:', error);
-        // If metrics don't exist yet, we'll use defaults and create them
+        // If metrics don't exist yet, create them for the new user
         if (user?.id) {
           try {
+            console.log('Creating initial metrics for new user:', user.id);
             await api.updateChatMetrics(user.id);
+            // Set default values for new user
+            setChatLimits({
+              dailyLimit: 5,
+              chatsUsedToday: 0,
+              isProUser: false
+            });
           } catch (err) {
             console.error('Failed to create initial metrics:', err);
           }
@@ -136,7 +147,8 @@ export function useChat() {
         },
         body: JSON.stringify({ 
           message: userInput,
-          sessionId: messages[0]?.id || Date.now().toString()
+          sessionId: messages[0]?.id || Date.now().toString(),
+          userId: user?.id
         })
       });
 
@@ -176,11 +188,13 @@ export function useChat() {
         }));
 
         // Update localStorage
-        localStorage.setItem('chatLimits', JSON.stringify({
-          dailyLimit: result.dailyLimit,
-          chatsUsedToday: result.chatsUsed,
-          lastUpdated: new Date().toISOString()
-        }));
+        if (user?.id) {
+          localStorage.setItem(`chatLimits-${user.id}`, JSON.stringify({
+            dailyLimit: result.dailyLimit,
+            chatsUsedToday: result.chatsUsed,
+            lastUpdated: new Date().toISOString()
+          }));
+        }
       }
 
       // Update metrics after successful message
@@ -214,11 +228,57 @@ export function useChat() {
         timestamp: Date.now(),
       },
     ]);
-    localStorage.removeItem("chat-messages");
-  }, []);
+    if (user?.id) {
+      localStorage.removeItem(`chat-messages-${user.id}`);
+    }
+  }, [user]);
+
+  // Reset chat state when user changes (new login)
+  useEffect(() => {
+    if (user?.id) {
+      // Clear any existing messages and reset to default
+      setMessages([
+        {
+          id: "0-ai",
+          text: "Hi there! I'm your ConsumerAI assistant. I can help with questions about credit reports, debt collection, and consumer protection laws. What can I help you with today?",
+          sender: "bot",
+          type: "ai",
+          timestamp: Date.now(),
+        },
+      ]);
+      
+      // Reset chat limits for new user session
+      setChatLimits({
+        dailyLimit: 5,
+        chatsUsedToday: 0,
+        isProUser: false
+      });
+    }
+  }, [user?.id]);
+
+  // Clean up old localStorage data when user changes
+  useEffect(() => {
+    if (user?.id) {
+      // Remove old generic localStorage keys that might cause issues
+      localStorage.removeItem('chat-messages');
+      localStorage.removeItem('chatLimits');
+      
+      // Only keep data for the current user
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if ((key.startsWith('chat-messages-') || key.startsWith('chatLimits-')) && 
+            !key.endsWith(user.id)) {
+          // Clean up other users' data from this browser to prevent confusion
+          localStorage.removeItem(key);
+        }
+      });
+    }
+  }, [user?.id]);
 
   // Reset counts at midnight
   useEffect(() => {
+    if (!user?.id) return;
+    
     const resetTime = new Date();
     resetTime.setHours(24, 0, 0, 0);
     const timeUntilReset = resetTime.getTime() - Date.now();
@@ -228,11 +288,11 @@ export function useChat() {
         ...prev,
         chatsUsedToday: 0
       }));
-      localStorage.removeItem('chatLimits');
+      localStorage.removeItem(`chatLimits-${user.id}`);
     }, timeUntilReset);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [user]);
 
   const updateMessages = useCallback((newMessages: Message[]) => {
     console.log("Setting messages:", newMessages);

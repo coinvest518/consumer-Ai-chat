@@ -69,7 +69,7 @@ const Dashboard = () => {
       try {
         if (!user) return;
         
-        const metricsData = await api.getChatLimits();
+        const metricsData = await api.getChatLimits(user.id);
         setMetrics({
           dailyLimit: metricsData.dailyLimit || 5,
           chatsUsed: metricsData.chatsUsed || 0,

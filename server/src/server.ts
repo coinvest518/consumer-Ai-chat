@@ -22,7 +22,7 @@ const port = process.env.PORT || 3000;
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-03-31.basil'
+  apiVersion: '2023-10-16'
 });
 
 // CORS configuration
@@ -78,6 +78,7 @@ const collections = {
 interface ChatRequest {
   message: string;
   sessionId: string;
+  userId: string;
 }
 
 interface LangflowResponse {
@@ -108,15 +109,22 @@ interface MetricsDoc {
 
 // Simple chat endpoint
 app.post('/api/chat', async (req: express.Request, res: express.Response) => {
-  const { message, sessionId } = req.body as ChatRequest;
+  const { message, sessionId, userId } = req.body as ChatRequest;
+
+  console.log('Chat request received:', { userId, message: message.slice(0, 50) + '...', sessionId });
 
   if (!message) {
     return res.status(400).json({ error: 'Message is required' });
   }
 
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
   try {
-    // Get current metrics
-    const currentMetrics = (await collections.userMetricsCollection.findOne({})) as MetricsDoc || {
+    // Get current metrics for the specific user
+    const currentMetrics = (await collections.userMetricsCollection.findOne({ userId })) as MetricsDoc || {
+      userId,
       dailyLimit: 5,
       chatsUsed: 0,
       isPro: false
@@ -174,6 +182,7 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
       
       // Update metrics after successful response
       const updatedMetrics = {
+        userId,
         dailyLimit: currentMetrics.dailyLimit,
         chatsUsed: currentMetrics.chatsUsed + 1,
         isPro: currentMetrics.isPro,
@@ -181,7 +190,7 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
       };
 
       await collections.userMetricsCollection.updateOne(
-        { userId: currentMetrics.userId || 'default' },
+        { userId },
         { $set: updatedMetrics },
         { upsert: true }
       );
@@ -271,6 +280,7 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
 
       // Update metrics after successful response
       const updatedMetrics = {
+        userId,
         dailyLimit: currentMetrics.dailyLimit,
         chatsUsed: currentMetrics.chatsUsed + 1,
         isPro: currentMetrics.isPro,
@@ -278,7 +288,7 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
       };
 
       await collections.userMetricsCollection.updateOne(
-        { userId: currentMetrics.userId || 'default' },
+        { userId },
         { $set: updatedMetrics },
         { upsert: true }
       );
@@ -297,13 +307,23 @@ app.post('/api/chat', async (req: express.Request, res: express.Response) => {
 });
 
 // Get user metrics/limits
-app.get('/api/user-metrics/limits', async (req, res) => {
+app.get('/api/user-metrics/limits/:userId', async (req, res) => {
   try {
-    const metrics = await collections.userMetricsCollection.findOne({});
+    const { userId } = req.params;
+    console.log('Fetching metrics for userId:', userId);
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    const metrics = await collections.userMetricsCollection.findOne({ userId });
+    console.log('Found metrics:', metrics);
+    
     res.json(metrics || {
       dailyLimit: 5,
       chatsUsed: 0,
-      isPro: false
+      isPro: false,
+      userId
     });
   } catch (error) {
     console.error('Error fetching metrics:', error);
@@ -354,6 +374,8 @@ app.post('/api/chat-history/save', async (req, res) => {
   try {
     const { userId, messages } = req.body;
     
+    console.log('Saving chat history for userId:', userId);
+    
     if (!userId || !messages) {
       return res.status(400).json({ error: 'userId and messages are required' });
     }
@@ -363,8 +385,15 @@ app.post('/api/chat-history/save', async (req, res) => {
       messages,
       title: messages[messages.length - 1]?.text?.slice(0, 50) || 'New Chat',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      timestamp: Date.now() // Add timestamp for easier debugging
     };
+    
+    console.log('Chat data to save:', { 
+      userId: chatData.userId, 
+      title: chatData.title, 
+      messageCount: messages.length 
+    });
     
     await collections.chatHistoryCollection.insertOne(chatData);
     res.json({ success: true, chatData });
@@ -652,4 +681,75 @@ app.listen(port, () => {
     env: process.env.NODE_ENV,
     isVercel: !!process.env.VERCEL
   });
-}); 
+});
+
+// Debug endpoint to clear a user's chat history (for testing)
+app.delete('/api/debug/clear-user-data/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    console.log('Clearing all data for userId:', userId);
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Clear chat history
+    const chatHistoryResult = await collections.chatHistoryCollection.deleteMany({ userId });
+    
+    // Clear user metrics
+    const metricsResult = await collections.userMetricsCollection.deleteMany({ userId });
+    
+    // Clear emails if any
+    const emailResult = await collections.emailCollection.deleteMany({ userId });
+    
+    res.json({
+      success: true,
+      message: `Cleared all data for user ${userId}`,
+      deletedCounts: {
+        chatHistory: chatHistoryResult.deletedCount,
+        metrics: metricsResult.deletedCount,
+        emails: emailResult.deletedCount
+      }
+    });
+  } catch (error) {
+    console.error('Error clearing user data:', error);
+    res.status(500).json({ error: 'Failed to clear user data' });
+  }
+});
+
+// Debug endpoint to initialize a new user with fresh data
+app.post('/api/debug/init-user', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    console.log('Initializing fresh user data for userId:', userId);
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Create fresh user metrics
+    const newMetrics = {
+      userId,
+      dailyLimit: 5,
+      chatsUsed: 0,
+      isPro: false,
+      lastUpdated: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+    
+    await collections.userMetricsCollection.updateOne(
+      { userId },
+      { $set: newMetrics },
+      { upsert: true }
+    );
+    
+    res.json({
+      success: true,
+      message: `Initialized fresh data for user ${userId}`,
+      metrics: newMetrics
+    });
+  } catch (error) {
+    console.error('Error initializing user:', error);
+    res.status(500).json({ error: 'Failed to initialize user' });
+  }
+});

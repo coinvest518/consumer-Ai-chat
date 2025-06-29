@@ -1,8 +1,8 @@
 import { API_BASE_URL } from './config';
 
 export const api = {
-  getChatLimits: async () => {
-    const response = await fetch(`${API_BASE_URL}/user-metrics/limits`);
+  getChatLimits: async (userId: string) => {
+    const response = await fetch(`${API_BASE_URL}/user-metrics/limits/${userId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch chat limits');
     }
