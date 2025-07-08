@@ -1,9 +1,11 @@
+
 import Stripe from 'stripe';
 import { userMetricsCollection, chatHistoryCollection } from './_db';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-03-31.basil' });
 
-export default async function handler(req, res) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     const { userId, email } = req.body;
     const currentMetrics = await userMetricsCollection.findOne({ userId }) || {
@@ -32,7 +34,8 @@ export default async function handler(req, res) {
   } else if (req.method === 'GET') {
     const { sessionId } = req.query;
     if (!sessionId) return res.status(400).json({ error: 'Session ID is required' });
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const sessionIdStr = Array.isArray(sessionId) ? sessionId[0] : sessionId;
+    const session = await stripe.checkout.sessions.retrieve(sessionIdStr);
     if (session.payment_status === 'paid') {
       res.json({ paid: true, customerEmail: session.customer_details?.email, sessionId });
     } else {

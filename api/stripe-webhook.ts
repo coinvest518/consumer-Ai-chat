@@ -1,5 +1,7 @@
+
 import Stripe from 'stripe';
 import { userMetricsCollection, chatHistoryCollection } from './_db';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-03-31.basil' });
 
@@ -9,7 +11,7 @@ export const config = {
   },
 };
 
-export default async function handler(req, res) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;

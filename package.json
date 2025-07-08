@@ -4,14 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev:server": "cd server && npm run dev",
-    "dev:client": "vite",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "vite",
     "build": "vite build",
-    "build:server": "cd server && tsc",
     "vercel-build": "npm run build",
     "preview": "vite preview",
-    "start": "node server/dist/src/server.js",
     "check": "tsc",
     "test-db": "tsx scripts/test-db.ts"
   },

@@ -1,6 +1,8 @@
 import { scheduledEmailCollection } from './_db';
 
-export default async function handler(req, res) {
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'POST') {
     const { userId, recipients, subject, body, scheduledTime } = req.body;
     if (!userId || !recipients || !subject || !body || !scheduledTime) {

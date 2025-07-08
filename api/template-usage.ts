@@ -1,6 +1,8 @@
 import { templateUsageCollection } from './_db';
 
-export default async function handler(req, res) {
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const { userId } = req.query;
     if (!userId) return res.status(400).json({ error: 'userId is required' });
