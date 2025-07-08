@@ -54,6 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     res.json({ received: true });
   } catch (err) {
-    res.status(400).send(`Webhook Error: ${err.message}`);
+    res.status(400).send(
+      `Webhook Error: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 }

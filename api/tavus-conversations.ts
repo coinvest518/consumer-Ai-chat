@@ -44,7 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
   if (!response || !response.ok) {
-    return res.status(500).json({ error: 'All Tavus API endpoints failed', details: lastError?.message });
+    return res.status(500).json({
+      error: 'All Tavus API endpoints failed',
+      details: lastError instanceof Error ? lastError.message : String(lastError)
+    });
   }
   const conversationData = await response.json();
   res.json(conversationData);

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -5,10 +6,13 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
 import { fadeIn } from '@/lib/animations';
+import { useNavigate } from 'react-router-dom';
+
 
 const Login = () => {
   const { signIn, signInWithGoogle, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -30,6 +34,7 @@ const Login = () => {
           title: "Success",
           description: "Logged in successfully!",
         });
+        navigate('/dashboard');
       } else {
         toast({
           variant: "destructive",
