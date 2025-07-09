@@ -2,7 +2,7 @@ import { API_BASE_URL } from './config';
 
 export const api = {
   getChatLimits: async (userId: string) => {
-    const response = await fetch(`${API_BASE_URL}/user-metrics/limits/${userId}`);
+    const response = await fetch(`${API_BASE_URL}/user-metrics?userId=${encodeURIComponent(userId)}`);
     if (!response.ok) {
       throw new Error('Failed to fetch chat limits');
     }
@@ -10,7 +10,7 @@ export const api = {
   },
 
   updateChatMetrics: async (userId: string) => {
-    const response = await fetch(`${API_BASE_URL}/user-metrics/update`, {
+    const response = await fetch(`${API_BASE_URL}/user-metrics`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -78,12 +78,12 @@ export const api = {
 
   // Enhanced credit management
   deductCredits: async (userId: string, amount: number, reason: string) => {
-    const response = await fetch(`${API_BASE_URL}/user-metrics/deduct`, {
+    const response = await fetch(`${API_BASE_URL}/user-metrics`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ userId, amount, reason }),
+      body: JSON.stringify({ userId, amount, reason, action: 'deduct' }),
     });
     if (!response.ok) throw new Error('Failed to deduct credits');
     return response.json();
