@@ -71,32 +71,33 @@ export function useChat() {
 
     const fetchLimits = async () => {
       try {
-        console.log('Fetching chat limits for user:', user.id);
         const metrics = await api.getChatLimits(user.id);
-        console.log('Received metrics:', metrics);
         if (metrics) {
+          console.log('Received metrics:', metrics);
           setChatLimits({
             dailyLimit: metrics.dailyLimit || 5,
             chatsUsedToday: metrics.chatsUsed || 0,
             isProUser: metrics.isPro || false
           });
-        }
-      } catch (error) {
-        console.error('Failed to fetch chat limits:', error);
-        // If metrics don't exist yet, create them for the new user
-        if (user?.id) {
+        } else {
+          // This assumes the API returns null/undefined for a new user (e.g., on a 404).
+          // This is a much safer pattern than catching all errors.
           try {
             console.log('Creating initial metrics for new user:', user.id);
             await api.updateChatMetrics(user.id);
-            // Set default values for new user
-            setChatLimits({
-              dailyLimit: 5,
-              chatsUsedToday: 0,
-              isProUser: false
-            });
+            setChatLimits({ dailyLimit: 5, chatsUsedToday: 0, isProUser: false });
           } catch (err) {
             console.error('Failed to create initial metrics:', err);
+            setError("We couldn't set up your account's usage limits. Please try again later.");
           }
+        }
+      } catch (error: any) {
+        if (error instanceof SyntaxError && error.message.includes("Unexpected token '<'")) {
+          console.error('Failed to fetch chat limits: The server returned an HTML error page instead of JSON. This is a server-side issue.', error);
+          setError("A server error occurred while fetching your data. Please try again later.");
+        } else {
+          console.error('Failed to fetch chat limits with an unexpected error:', error);
+          setError("An unexpected error occurred while fetching your data.");
         }
       }
     };
@@ -160,10 +161,15 @@ export function useChat() {
         } catch (jsonErr) {
           // If response is not JSON or empty, fallback to text
           try {
-            const text = await response.text();
-            errorData = { error: text };
+            const errorText = await response.text();
+            // Check if the server returned an HTML page, which is a common sign of a server-side error.
+            if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
+              errorData = { error: `Server Error: Received an HTML page instead of JSON. Status: ${response.status}` };
+            } else {
+              errorData = { error: errorText || 'The server returned an empty error response.' };
+            }
           } catch {
-            errorData = { error: 'Unknown error' };
+            errorData = { error: `API request failed with status ${response.status}` };
           }
         }
         if (response.status === 504 || (errorData && typeof errorData === 'object' && 'isTimeout' in errorData && errorData.isTimeout)) {
@@ -326,8 +332,14 @@ export function useChat() {
           messages: chat.messages
         }));
         setChatSessions(sessions);
-      } catch (error) {
-        console.error('Error fetching chat sessions:', error);
+      } catch (error: any) {
+        if (error instanceof SyntaxError && error.message.includes("Unexpected token '<'")) {
+          console.error('Error fetching chat sessions: The server returned an HTML error page instead of JSON. This is a server-side issue.', error);
+          setError("Could not load your chat history due to a server problem.");
+        } else {
+          console.error('Error fetching chat sessions:', error);
+          setError("Could not load your chat history.");
+        }
         setChatSessions([]);
       }
     };

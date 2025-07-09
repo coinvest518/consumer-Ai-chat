@@ -3,9 +3,7 @@
  * In production, use relative path
  * In development, use localhost:3000
  */
-export const API_BASE_URL = import.meta.env.PROD 
-  ? '/api' 
-  : 'http://localhost:3000/api';
+export const API_BASE_URL = '/api';
 
 /**
  * Log environment state during initialization
@@ -25,4 +23,4 @@ console.log('Environment:', {
 export const getBaseUrl = (): string => {
   // Always use root path
   return '';
-}; 
+};
