@@ -433,14 +433,16 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
               <ChatMessage key={message.id || index} message={message} />
             ))
           )}
-          {currentStep && (
-            <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm text-gray-600">
-                {currentStep === 'understanding' && "Understanding your question..."}
-                {currentStep === 'processing' && "Processing information..."}
-                {currentStep === 'generating' && "Generating response..."}
-              </span>
+          {currentStep && AI_STEPS[currentStep] && (
+            <div className={`flex items-center gap-2 p-3 bg-gray-100 rounded-lg border-l-4 ${AI_STEPS[currentStep].color}`}>
+              {(() => {
+                const Icon = AI_STEPS[currentStep].icon;
+                return <Icon className="w-4 h-4 animate-spin" />;
+              })()}
+              <div className="flex flex-col text-left">
+                <span className="text-sm font-semibold">{AI_STEPS[currentStep].title}</span>
+                <span className="text-xs text-gray-600">{AI_STEPS[currentStep].description}</span>
+              </div>
             </div>
           )}
           <div ref={messagesEndRef} />

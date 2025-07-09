@@ -9,33 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 
-interface StepIndicator {
-  icon: typeof Brain | typeof Loader2 | typeof MessageSquare;
-  title: string;
-  description: string;
-  color: string;
-}
-
-const AI_STEPS: Record<string, StepIndicator> = {
-  understanding: {
-    icon: Brain,
-    title: "Understanding Query",
-    description: "Analyzing your question",
-    color: "border-blue-500 text-blue-500"
-  },
-  processing: {
-    icon: Loader2,
-    title: "Processing",
-    description: "Searching knowledge base",
-    color: "border-purple-500 text-purple-500"
-  },
-  generating: {
-    icon: MessageSquare,
-    title: "Generating Response",
-    description: "Crafting detailed answer",
-    color: "border-green-500 text-green-500"
-  }
-};
+// StepIndicator and AI_STEPS are defined and used in ChatInterface.tsx for progress UI.
+// If you need to customize step UI, edit them in ChatInterface.tsx.
 
 const Chat = () => {
   const { chatId } = useParams();

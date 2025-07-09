@@ -152,12 +152,24 @@ export function useChat() {
         })
       });
 
+
       if (!response.ok) {
-        const errorData = await response.json();
-        if (response.status === 504 || errorData.isTimeout) {
+        let errorData: any = {};
+        try {
+          errorData = await response.json();
+        } catch (jsonErr) {
+          // If response is not JSON or empty, fallback to text
+          try {
+            const text = await response.text();
+            errorData = { error: text };
+          } catch {
+            errorData = { error: 'Unknown error' };
+          }
+        }
+        if (response.status === 504 || (errorData && typeof errorData === 'object' && 'isTimeout' in errorData && errorData.isTimeout)) {
           throw new Error('The AI is taking longer than expected to respond. Please try again.');
         }
-        throw new Error(`API request failed with status ${response.status}`);
+        throw new Error((errorData && typeof errorData === 'object' && 'error' in errorData && errorData.error) ? errorData.error : `API request failed with status ${response.status}`);
       }
 
       const result = await response.json() as ChatResponse;
