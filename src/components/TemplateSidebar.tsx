@@ -538,8 +538,21 @@ export default function TemplateSidebar({
     try {
       setIsProcessing(true);
       
-      // Deduct specific credits for this template
-      await api.deductCredits(user.id, template.creditCost, `Template: ${template.name}`);
+      // Call the API to use the template and deduct credits
+      await api.useTemplate(user.id, {
+        id: `usage-${template.id}-${Date.now()}`, // Generate a unique ID for this usage
+        template_id: template.id,      // Original field
+        credit_cost: template.creditCost, // Original field
+        templateId: template.id,       // Alias
+        creditCost: template.creditCost, // Alias
+        credits_remaining: userCredits - template.creditCost,
+        created_at: new Date().toISOString(),
+        metadata: {
+          name: template.name,
+          type: template.type,
+          legalArea: template.legalArea
+        }
+      });
       
       // Call the template selection handler
       onTemplateSelect(template);

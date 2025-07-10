@@ -10,8 +10,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/src/server.js",
-    "dev": "nodemon",
-    "test": "node test.js"
+    "dev": "nodemon"
   },
   "keywords": [],
   "author": "",
