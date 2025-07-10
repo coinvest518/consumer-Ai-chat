@@ -1,9 +1,8 @@
 /**
  * Base API URL for backend requests
- * In production, use relative path
- * In development, use localhost:3000
+ * Use VITE_API_BASE_URL environment variable or fallback to /api
  */
-export const API_BASE_URL = '/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /**
  * Log environment state during initialization
