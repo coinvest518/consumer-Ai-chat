@@ -27,10 +27,19 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
+// Default headers for all API calls
+const defaultHeaders = {
+  'Content-Type': 'application/json',
+  'Accept': 'application/json'
+};
+
 export const api = {
   getChatLimits: async (userId: string): Promise<ChatMetricsResponse> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/user-metrics?userId=${encodeURIComponent(userId)}`);
+      const response = await fetch(`${API_BASE_URL}/user-metrics?userId=${encodeURIComponent(userId)}`, {
+        headers: defaultHeaders,
+        credentials: 'include'
+      });
       const data = await handleResponse<UserMetrics>(response);
       return {
         chatsUsed: data.chats_used,
@@ -47,7 +56,10 @@ export const api = {
 
   getChatHistory: async (userId: string): Promise<ChatHistoryMessage[]> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/chat-history/${encodeURIComponent(userId)}`);
+      const response = await fetch(`${API_BASE_URL}/chat-history/${encodeURIComponent(userId)}`, {
+        headers: defaultHeaders,
+        credentials: 'include'
+      });
       return handleResponse<ChatHistoryMessage[]>(response);
     } catch (error: any) {
       console.error('Get chat history error:', error);
@@ -65,8 +77,9 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE_URL}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(chatData)
+        headers: defaultHeaders,
+        body: JSON.stringify(chatData),
+        credentials: 'include'
       });
       return handleResponse<ChatHistoryMessage>(response);
     } catch (error: any) {
@@ -82,13 +95,14 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE_URL}/template-usage`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: defaultHeaders,
         body: JSON.stringify({
           userId,
           templateId: templateData.templateId,
           creditCost: templateData.creditCost,
           metadata: templateData.metadata
-        })
+        }),
+        credentials: 'include'
       });
       return handleResponse(response);
     } catch (error: any) {
@@ -99,7 +113,10 @@ export const api = {
 
   getTemplateUsage: async (userId: string): Promise<TemplateUsage[]> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/template-usage?userId=${encodeURIComponent(userId)}`);
+      const response = await fetch(`${API_BASE_URL}/template-usage?userId=${encodeURIComponent(userId)}`, {
+        headers: defaultHeaders,
+        credentials: 'include'
+      });
       return handleResponse<TemplateUsage[]>(response);
     } catch (error: any) {
       console.error('Get template usage error:', error);
@@ -111,8 +128,9 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE_URL}/emails`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...emailData, userId })
+        headers: defaultHeaders,
+        body: JSON.stringify({ ...emailData, userId }),
+        credentials: 'include'
       });
       return handleResponse<ApiResponse>(response);
     } catch (error: any) {
@@ -125,8 +143,9 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE_URL}/emails`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...emailData, userId, type: 'scheduled' })
+        headers: defaultHeaders,
+        body: JSON.stringify({ ...emailData, userId, type: 'scheduled' }),
+        credentials: 'include'
       });
       return handleResponse<ApiResponse>(response);
     } catch (error: any) {
@@ -137,7 +156,10 @@ export const api = {
 
   verifyPayment: async (sessionId: string): Promise<ApiResponse> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/verify-payment?sessionId=${encodeURIComponent(sessionId)}`);
+      const response = await fetch(`${API_BASE_URL}/verify-payment?sessionId=${encodeURIComponent(sessionId)}`, {
+        headers: defaultHeaders,
+        credentials: 'include'
+      });
       return handleResponse<ApiResponse>(response);
     } catch (error: any) {
       console.error('Payment verification error:', error);
@@ -151,8 +173,14 @@ export const api = {
         api.getChatLimits(userId),
         api.getChatHistory(userId),
         api.getTemplateUsage(userId),
-        fetch(`${API_BASE_URL}/emails?userId=${encodeURIComponent(userId)}`),
-        fetch(`${API_BASE_URL}/purchases?userId=${encodeURIComponent(userId)}`)
+        fetch(`${API_BASE_URL}/emails?userId=${encodeURIComponent(userId)}`, {
+          headers: defaultHeaders,
+          credentials: 'include'
+        }),
+        fetch(`${API_BASE_URL}/purchases?userId=${encodeURIComponent(userId)}`, {
+          headers: defaultHeaders,
+          credentials: 'include'
+        })
       ]);
 
       const [emails, purchases] = await Promise.all([

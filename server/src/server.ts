@@ -28,6 +28,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:3000',
   'https://consumer-ai.vercel.app',
   'https://consumer-ai-chat.vercel.app',
   'https://consumer-ai-chat-git-main.vercel.app',
@@ -35,25 +36,25 @@ const allowedOrigins = [
   'https://www.consumerai.info'
 ];
 
-// More permissive CORS setup for Vercel deployments
+// More permissive CORS setup
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests)
-    if (!origin) {
-      console.log('Allowing request with no origin');
-      return callback(null, true);
-    }
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
     
-    // Allow specific origins and any Vercel deployment
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app') || origin.includes('consumerai.info')) {
-      console.log('Allowing origin:', origin);
-      return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      console.log('Blocked origin:', origin);
+      // Just allow all origins in development
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      return callback(null, allowedOrigins[0]);
     }
-    
-    console.log('CORS blocked origin:', origin);
-    callback(new Error('Not allowed by CORS'));
+    return callback(null, true);
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 app.use(express.json());
