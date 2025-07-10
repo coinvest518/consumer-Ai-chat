@@ -2,22 +2,14 @@ import { cn } from "@/lib/utils";
 import { FormattedMessage } from "./FormattedMessage";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Mail } from "lucide-react";
+import { Message } from "@/lib/types";
 
 interface ChatMessageProps {
-  message: {
-    text: string;
-    type: 'user' | 'ai' | 'email';
-    emailMetadata?: {
-      subject: string;
-      body: string;
-      sender?: string;
-      recipients?: string[];
-    };
-  };
+  message: Message;
 }
 
 export default function ChatMessage({ message }: ChatMessageProps) {
-  const isUser = message.type === 'user';
+  const isUser = message.sender === 'user';
   const isEmail = message.type === 'email';
 
   return (
@@ -42,15 +34,15 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       </Avatar>
 
       <div className="flex-1 space-y-2">
-        {isEmail && message.emailMetadata ? (
+        {isEmail && message.metadata?.emailMetadata ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Mail className="h-4 w-4" />
               <span>Email Analysis</span>
             </div>
             <div className="border rounded-md p-3 bg-gray-50">
-              <div className="font-medium">Subject: {message.emailMetadata.subject}</div>
-              <div className="mt-2 text-sm text-gray-600">{message.emailMetadata.body}</div>
+              <div className="font-medium">Subject: {message.metadata.emailMetadata.subject}</div>
+              <div className="mt-2 text-sm text-gray-600">{message.metadata.emailMetadata.body}</div>
             </div>
           </div>
         ) : (

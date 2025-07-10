@@ -56,7 +56,23 @@ const Dashboard = () => {
         if (!user) return;
 
         const response = await api.getChatHistory(user.id);
-        setChatHistory(response || []);
+        // Transform response to ChatHistory[] if needed
+        const chats: ChatHistory[] = (response || []).map((item: any) => ({
+          id: item.id ?? item._id ?? '',
+          userId: item.userId ?? '',
+          messages: (item.messages ?? []).map((msg: any) => ({
+            id: msg.id,
+            text: msg.text,
+            sender: msg.sender,
+            type: msg.type === 'user' || msg.type === 'ai' ? msg.type : msg.sender === 'user' ? 'user' : 'ai',
+            timestamp: msg.timestamp || Date.now(),
+          })),
+          timestamp: item.timestamp,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          _id: item._id
+        }));
+        setChatHistory(chats);
         setError(null);
       } catch (err) {
         console.error('Error fetching chat history:', err);
@@ -73,9 +89,9 @@ const Dashboard = () => {
         
         const metricsData = await api.getChatLimits(user.id);
         setMetrics({
-          dailyLimit: metricsData.dailyLimit || 5,
-          chatsUsed: metricsData.chatsUsed || 0,
-          remaining: (metricsData.dailyLimit || 5) - (metricsData.chatsUsed || 0)
+          dailyLimit: metricsData.daily_limit || 5,
+          chatsUsed: metricsData.chats_used || 0,
+          remaining: (metricsData.daily_limit || 5) - (metricsData.chats_used || 0)
         });
       } catch (err) {
         console.error('Error fetching metrics:', err);
@@ -148,9 +164,9 @@ const Dashboard = () => {
       
       const metricsData = await api.getChatLimits(user.id);
       setMetrics({
-        dailyLimit: metricsData.dailyLimit || 5,
-        chatsUsed: metricsData.chatsUsed || 0,
-        remaining: (metricsData.dailyLimit || 5) - (metricsData.chatsUsed || 0)
+        dailyLimit: metricsData.daily_limit || 5,
+        chatsUsed: metricsData.chats_used || 0,
+        remaining: (metricsData.daily_limit || 5) - (metricsData.chats_used || 0)
       });
     } catch (err) {
       console.error('Error fetching metrics:', err);
@@ -282,6 +298,7 @@ const Dashboard = () => {
             <ChatList 
               sessions={chatSessions.length > 0 ? chatSessions : chatHistory.map(chat => ({
                 id: chat.id,
+                sessionId: chat.id, // Add sessionId as required by ChatSession
                 title: 'Chat',
                 lastMessage: chat.messages[chat.messages.length - 1]?.text || '',
                 updatedAt: new Date(chat.timestamp || Date.now()),

@@ -4,7 +4,7 @@ export interface Message {
   id?: string;
   text: string;
   sender: 'user' | 'bot';
-  type: 'chat' | 'system' | 'purchase' | 'email';
+  type: 'chat' | 'system' | 'purchase' | 'email' | 'user' | 'ai';  // Added 'user' and 'ai' for compatibility
   timestamp: number;
   citation?: string;
   actions?: string[];
@@ -66,6 +66,13 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   details?: string;
+}
+
+export interface PaymentVerificationResponse {
+  paid: boolean;
+  customerEmail?: string;
+  sessionId: string;
+  processed: boolean;
 }
 
 export interface ChatMetricsResponse {

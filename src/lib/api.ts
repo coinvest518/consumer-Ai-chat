@@ -5,66 +5,50 @@ import type {
   TemplateUsage, 
   Purchase 
 } from '../../api/_supabase';
-import type {
-  Message,
-  ChatSession,
-  EmailData,
-  TemplateData,
-  UserData,
-  ApiResponse,
-  ChatMetricsResponse
-} from './types';
-import { ApiError } from './utils';
+import type { PaymentVerificationResponse } from './types';
+import { supabase } from './supabase';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
-// Helper function to handle API responses
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: response.statusText }));
-    throw new ApiError(error.message || 'API request failed', error.details);
+// Helper function to handle Supabase responses
+async function handleSupabaseResponse<T>(
+  { data, error }: { data: T | null; error: any }
+): Promise<T> {
+  if (error) {
+    console.error('API Error:', error);
+    throw new Error(error.message || 'An error occurred');
   }
-  return response.json();
+  return data as T;
 }
 
-// Default headers for all API calls
-const defaultHeaders = {
-  'Content-Type': 'application/json',
-  'Accept': 'application/json'
-};
-
 export const api = {
-  getChatLimits: async (userId: string): Promise<ChatMetricsResponse> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/user-metrics?userId=${encodeURIComponent(userId)}`, {
-        headers: defaultHeaders,
-        credentials: 'include'
-      });
-      const data = await handleResponse<UserMetrics>(response);
-      return {
-        chatsUsed: data.chats_used,
-        dailyLimit: data.daily_limit,
-        remaining: data.daily_limit - data.chats_used,
-        isPro: data.is_pro,
-        lastUpdated: data.last_updated
-      };
-    } catch (error: any) {
-      console.error('Get chat limits error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to fetch chat limits', error.message);
+  getChatLimits: async (userId: string): Promise<UserMetrics> => {
+    const { data, error } = await supabase
+      .from('user_metrics')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+      
+    if (error && error.code !== 'PGRST116') {
+      throw error;
     }
+
+    // Return default metrics if none exist
+    return data || {
+      user_id: userId,
+      daily_limit: 5,
+      chats_used: 0,
+      is_pro: false,
+      last_updated: new Date().toISOString()
+    };
   },
 
   getChatHistory: async (userId: string): Promise<ChatHistoryMessage[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/chat-history/${encodeURIComponent(userId)}`, {
-        headers: defaultHeaders,
-        credentials: 'include'
-      });
-      return handleResponse<ChatHistoryMessage[]>(response);
-    } catch (error: any) {
-      console.error('Get chat history error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to fetch chat history', error.message);
-    }
+    return handleSupabaseResponse(
+      await supabase
+        .from('chat_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+    );
   },
 
   saveChat: async (chatData: {
@@ -74,136 +58,156 @@ export const api = {
     sessionId?: string;
     metadata?: Record<string, any>;
   }): Promise<ChatHistoryMessage> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/chat`, {
-        method: 'POST',
-        headers: defaultHeaders,
-        body: JSON.stringify(chatData),
-        credentials: 'include'
-      });
-      return handleResponse<ChatHistoryMessage>(response);
-    } catch (error: any) {
-      console.error('Save chat error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to save chat', error.message);
-    }
+    const newMessage = {
+      user_id: chatData.userId,
+      session_id: chatData.sessionId || crypto.randomUUID(),
+      message: chatData.message,
+      response: chatData.response,
+      message_type: 'chat',
+      metadata: chatData.metadata
+    };
+
+    return handleSupabaseResponse(
+      await supabase
+        .from('chat_history')
+        .insert([newMessage])
+        .select()
+        .single()
+    );
   },
 
   useTemplate: async (
     userId: string,
-    templateData: TemplateData
-  ): Promise<ApiResponse<{ templateUsage: TemplateUsage; remaining: number }>> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/template-usage`, {
-        method: 'POST',
-        headers: defaultHeaders,
-        body: JSON.stringify({
-          userId,
-          templateId: templateData.templateId,
-          creditCost: templateData.creditCost,
-          metadata: templateData.metadata
-        }),
-        credentials: 'include'
-      });
-      return handleResponse(response);
-    } catch (error: any) {
-      console.error('Use template error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to use template', error.message);
+    templateData: {
+      template_id: string;
+      credit_cost: number;
+      credits_remaining: number;
+      metadata?: Record<string, any>;
     }
+  ): Promise<{ templateUsage: TemplateUsage; remaining: number }> => {
+    // Use the stored procedure to handle template usage atomically
+    const { data, error } = await supabase.rpc('use_template', {
+      p_user_id: userId,
+      p_template_id: templateData.template_id,
+      p_credit_cost: templateData.credit_cost
+    });
+
+    if (error) throw error;
+
+    return {
+      templateUsage: data,
+      remaining: templateData.credits_remaining - templateData.credit_cost
+    };
   },
 
   getTemplateUsage: async (userId: string): Promise<TemplateUsage[]> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/template-usage?userId=${encodeURIComponent(userId)}`, {
-        headers: defaultHeaders,
-        credentials: 'include'
-      });
-      return handleResponse<TemplateUsage[]>(response);
-    } catch (error: any) {
-      console.error('Get template usage error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to fetch template usage', error.message);
-    }
+    return handleSupabaseResponse(
+      await supabase
+        .from('template_usage')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+    );
   },
 
-  sendEmail: async (userId: string, emailData: EmailData): Promise<ApiResponse> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/emails`, {
-        method: 'POST',
-        headers: defaultHeaders,
-        body: JSON.stringify({ ...emailData, userId }),
-        credentials: 'include'
-      });
-      return handleResponse<ApiResponse>(response);
-    } catch (error: any) {
-      console.error('Send email error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to send email', error.message);
-    }
-  },
-
-  scheduleEmail: async (userId: string, emailData: EmailData): Promise<ApiResponse> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/emails`, {
-        method: 'POST',
-        headers: defaultHeaders,
-        body: JSON.stringify({ ...emailData, userId, type: 'scheduled' }),
-        credentials: 'include'
-      });
-      return handleResponse<ApiResponse>(response);
-    } catch (error: any) {
-      console.error('Schedule email error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to schedule email', error.message);
-    }
-  },
-
-  verifyPayment: async (sessionId: string): Promise<ApiResponse> => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/verify-payment?sessionId=${encodeURIComponent(sessionId)}`, {
-        headers: defaultHeaders,
-        credentials: 'include'
-      });
-      return handleResponse<ApiResponse>(response);
-    } catch (error: any) {
-      console.error('Payment verification error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to verify payment', error.message);
-    }
-  },
-
-  getUserData: async (userId: string): Promise<UserData> => {
-    try {
-      const [metrics, chatHistory, templateUsage, emailsRes, purchasesRes] = await Promise.all([
-        api.getChatLimits(userId),
-        api.getChatHistory(userId),
-        api.getTemplateUsage(userId),
-        fetch(`${API_BASE_URL}/emails?userId=${encodeURIComponent(userId)}`, {
-          headers: defaultHeaders,
-          credentials: 'include'
-        }),
-        fetch(`${API_BASE_URL}/purchases?userId=${encodeURIComponent(userId)}`, {
-          headers: defaultHeaders,
-          credentials: 'include'
-        })
-      ]);
-
-      const [emails, purchases] = await Promise.all([
-        handleResponse<Email[]>(emailsRes),
-        handleResponse<Purchase[]>(purchasesRes)
-      ]);
-
-      return {
-        metrics: {
+  sendEmail: async (userId: string, emailData: {
+    recipients: string[];
+    subject: string;
+    body: string;
+    metadata?: Record<string, any>;
+  }): Promise<Email> => {
+    return handleSupabaseResponse(
+      await supabase
+        .from('emails')
+        .insert([{
           user_id: userId,
-          daily_limit: metrics.dailyLimit,
-          chats_used: metrics.chatsUsed,
-          is_pro: metrics.isPro,
-          last_updated: metrics.lastUpdated
-        } as UserMetrics,
-        chatHistory,
-        templateUsage,
-        emails,
-        purchases
-      };
-    } catch (error: any) {
-      console.error('Get user data error:', error);
-      throw error instanceof ApiError ? error : new ApiError('Failed to fetch user data', error.message);
+          recipients: emailData.recipients,
+          subject: emailData.subject,
+          body: emailData.body,
+          status: 'pending',
+          metadata: emailData.metadata
+        }])
+        .select()
+        .single()
+    );
+  },
+
+  scheduleEmail: async (userId: string, emailData: {
+    recipients: string[];
+    subject: string;
+    body: string;
+    scheduledTime: string;
+    metadata?: Record<string, any>;
+  }): Promise<Email> => {
+    return handleSupabaseResponse(
+      await supabase
+        .from('emails')
+        .insert([{
+          user_id: userId,
+          recipients: emailData.recipients,
+          subject: emailData.subject,
+          body: emailData.body,
+          status: 'pending',
+          scheduled_time: emailData.scheduledTime,
+          metadata: emailData.metadata
+        }])
+        .select()
+        .single()
+    );
+  },
+
+  verifyPayment: async (sessionId: string): Promise<PaymentVerificationResponse> => {
+    const response = await fetch(`/api/verify-payment?sessionId=${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to verify payment');
     }
+
+    return response.json();
+  },
+
+  getUserData: async (userId: string): Promise<{
+    metrics: UserMetrics;
+    emails: Email[];
+    purchases: Purchase[];
+  }> => {
+    const [
+      { data: metrics },
+      { data: emails },
+      { data: purchases }
+    ] = await Promise.all([
+      supabase
+        .from('user_metrics')
+        .select('*')
+        .eq('user_id', userId)
+        .single(),
+      supabase
+        .from('emails')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('purchases')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+    ]);
+
+    return {
+      metrics: metrics || {
+        user_id: userId,
+        daily_limit: 5,
+        chats_used: 0,
+        is_pro: false,
+        last_updated: new Date().toISOString()
+      },
+      emails: emails || [],
+      purchases: purchases || []
+    };
   }
 };

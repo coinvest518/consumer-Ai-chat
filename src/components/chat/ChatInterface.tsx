@@ -201,11 +201,13 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
         sender: 'user',
         type: 'email',
         timestamp: Date.now(),
-        emailMetadata: {
-          subject: emailForm.subject,
-          body: emailForm.body,
-          sender: user?.email || '',
-          recipients: []
+        metadata: {
+          emailMetadata: {
+            subject: emailForm.subject,
+            body: emailForm.body,
+            sender: user?.email || '',
+            recipients: []
+          }
         }
       };
 

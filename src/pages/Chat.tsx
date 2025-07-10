@@ -8,6 +8,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import type { Message } from "@/lib/types";
 
 // StepIndicator and AI_STEPS are defined and used in ChatInterface.tsx for progress UI.
 // If you need to customize step UI, edit them in ChatInterface.tsx.
@@ -37,10 +38,31 @@ const Chat = () => {
   // Load existing chat if chatId exists
   useEffect(() => {
     const loadChat = async () => {
-      if (!chatId) return;
+      if (!chatId || !user) return;
       try {
-        const chat = await api.getChat(chatId);
-        setMessages(chat.messages);
+        const chatHistory = await api.getChatHistory(user.id);
+        const currentChat = chatHistory.find(chat => chat.session_id === chatId);
+        if (!currentChat) {
+          throw new Error('Chat not found');
+        }
+        // Convert chat history format to messages format
+        const messages: Message[] = [
+          {
+            id: currentChat.id,
+            text: currentChat.message,
+            sender: "user",
+            type: "user",
+            timestamp: new Date(currentChat.created_at).getTime(),
+          },
+          {
+            id: `${currentChat.id}-response`,
+            text: currentChat.response,
+            sender: "bot",
+            type: "ai",
+            timestamp: new Date(currentChat.created_at).getTime() + 1,
+          },
+        ];
+        setMessages(messages);
       } catch (error) {
         console.error('Error loading chat:', error);
         toast({

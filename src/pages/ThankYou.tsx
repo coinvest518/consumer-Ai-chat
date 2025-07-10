@@ -6,6 +6,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import type { PaymentVerificationResponse } from '@/lib/types';
 
 const ThankYou = () => {
   const [searchParams] = useSearchParams();
@@ -140,4 +141,4 @@ const ThankYou = () => {
   );
 };
 
-export default ThankYou; 
+export default ThankYou;

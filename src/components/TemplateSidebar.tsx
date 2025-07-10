@@ -540,13 +540,9 @@ export default function TemplateSidebar({
       
       // Call the API to use the template and deduct credits
       await api.useTemplate(user.id, {
-        id: `usage-${template.id}-${Date.now()}`, // Generate a unique ID for this usage
-        template_id: template.id,      // Original field
-        credit_cost: template.creditCost, // Original field
-        templateId: template.id,       // Alias
-        creditCost: template.creditCost, // Alias
+        template_id: template.id,
+        credit_cost: template.creditCost,
         credits_remaining: userCredits - template.creditCost,
-        created_at: new Date().toISOString(),
         metadata: {
           name: template.name,
           type: template.type,
