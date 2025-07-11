@@ -19,14 +19,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, './src'),
-      // Map all use-sync-external-store imports to React's built-in implementation
-      "use-sync-external-store/shim": "react",
-      "use-sync-external-store/shim/with-selector": "react",
-      "use-sync-external-store": "react",
-      // Ensure radix-ui components use the same React instance
-      "react": path.resolve(__dirname, './node_modules/react'),
-      "react-dom": path.resolve(__dirname, './node_modules/react-dom')
+      "@": path.resolve(__dirname, './src')
     }
   },
   server: {
@@ -43,64 +36,12 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
-    // Ensure assets are properly handled with the correct base path
     assetsDir: 'assets',
-    emptyOutDir: true,
-    minify: true,
-    rollupOptions: {
-      external: [],
-      output: {
-        manualChunks: (id) => {
-          // Vendor chunks
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'react-vendor';
-            }
-            if (id.includes('framer-motion')) {
-              return 'framer-vendor';
-            }
-            if (id.includes('@radix-ui')) {
-              return 'radix-vendor';
-            }
-            if (id.includes('lucide-react')) {
-              return 'icons-vendor';
-            }
-            return 'vendor';
-          }
-          
-          // Only chunk specific file patterns, avoid directories
-          if (id.includes('/src/components/') && id.endsWith('.tsx') && !id.includes('/src/components/ui/')) {
-            return 'components';
-          }
-          
-          // Explicitly avoid chunking UI components
-          if (id.includes('/src/components/ui/')) {
-            return undefined;
-          }
-          
-          return undefined;
-        }
-      }
-    }
+    emptyOutDir: true
   },
   optimizeDeps: {
-    include: [
-      'react', 
-      'react-dom', 
-      'react-router-dom', 
-      'framer-motion',
-      '@radix-ui/react-dialog',
-      '@radix-ui/react-popover',
-      '@radix-ui/react-accordion',
-      '@radix-ui/react-avatar',
-      '@radix-ui/react-toggle',
-      '@radix-ui/react-toast'
-    ],
     esbuildOptions: {
-      target: 'es2020',
-      supported: { 
-        'top-level-await': true 
-      },
+      target: 'es2020'
     }
   },
   envPrefix: 'VITE_'
