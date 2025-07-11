@@ -133,9 +133,11 @@ var Dashboard = function () {
                         _a.trys.push([0, 2, , 3]);
                         if (!user)
                             return [2 /*return*/];
+                        console.log('Dashboard: Fetching metrics for user:', user.id);
                         return [4 /*yield*/, api_1.api.getChatLimits(user.id)];
                     case 1:
                         metricsData = _a.sent();
+                        console.log('Dashboard: Received metrics data:', metricsData);
                         setMetrics({
                             dailyLimit: metricsData.daily_limit || 5,
                             chatsUsed: metricsData.chats_used || 0,
@@ -144,7 +146,13 @@ var Dashboard = function () {
                         return [3 /*break*/, 3];
                     case 2:
                         err_2 = _a.sent();
-                        console.error('Error fetching metrics:', err_2);
+                        console.error('Dashboard: Error fetching metrics:', err_2);
+                        // Set default metrics on error to avoid blocking the dashboard
+                        setMetrics({
+                            dailyLimit: 5,
+                            chatsUsed: 0,
+                            remaining: 5
+                        });
                         return [3 /*break*/, 3];
                     case 3: return [2 /*return*/];
                 }

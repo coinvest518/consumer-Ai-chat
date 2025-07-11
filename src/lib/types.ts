@@ -20,6 +20,18 @@ export interface Chat {
   metadata?: Record<string, any>;
 }
 
+// Add ChatHistory interface for API responses
+export interface ChatHistory {
+  id: string;
+  sessionId: string;
+  title?: string;
+  messages: Message[];
+  timestamp: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+  metadata?: Record<string, any>;
+}
+
 export interface AIResponse {
   text: string;
   citation?: string;

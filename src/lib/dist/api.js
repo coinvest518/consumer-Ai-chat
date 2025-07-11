@@ -53,62 +53,106 @@ function handleSupabaseResponse(_a) {
 }
 exports.api = {
     getChatLimits: function (userId) { return __awaiter(void 0, void 0, Promise, function () {
-        var session, token, response, contentType, errorData, _a, data, error_1;
-        var _b, _c;
-        return __generator(this, function (_d) {
-            switch (_d.label) {
+        var session, token, endpoints, lastError, _i, endpoints_1, endpoint, headers, response, contentType, data, errorData, fetchError_1, error_1;
+        var _a, _b;
+        return __generator(this, function (_c) {
+            switch (_c.label) {
                 case 0:
-                    _d.trys.push([0, 9, , 10]);
+                    _c.trys.push([0, 15, , 16]);
                     return [4 /*yield*/, supabase_1.supabase.auth.getSession()];
                 case 1:
-                    session = _d.sent();
-                    token = (_c = (_b = session === null || session === void 0 ? void 0 : session.data) === null || _b === void 0 ? void 0 : _b.session) === null || _c === void 0 ? void 0 : _c.access_token;
-                    if (!token) {
-                        throw new Error('No authentication token available');
-                    }
-                    return [4 /*yield*/, fetch("/api/user/metrics?user_id=" + userId, {
-                            headers: {
-                                'Authorization': "Bearer " + token,
-                                'Content-Type': 'application/json'
-                            }
-                        })];
+                    session = _c.sent();
+                    token = (_b = (_a = session === null || session === void 0 ? void 0 : session.data) === null || _a === void 0 ? void 0 : _a.session) === null || _b === void 0 ? void 0 : _b.access_token;
+                    console.log('Fetching chat limits for user:', userId);
+                    console.log('Auth token available:', !!token);
+                    endpoints = [
+                        "/api/user/metrics?user_id=" + userId,
+                        "/api/user/metrics-simple?user_id=" + userId
+                    ];
+                    lastError = null;
+                    _i = 0, endpoints_1 = endpoints;
+                    _c.label = 2;
                 case 2:
-                    response = _d.sent();
-                    contentType = response.headers.get('content-type');
-                    if (!!response.ok) return [3 /*break*/, 7];
-                    if (!(contentType === null || contentType === void 0 ? void 0 : contentType.includes('application/json'))) return [3 /*break*/, 4];
-                    return [4 /*yield*/, response.json()];
+                    if (!(_i < endpoints_1.length)) return [3 /*break*/, 14];
+                    endpoint = endpoints_1[_i];
+                    _c.label = 3;
                 case 3:
-                    _a = _d.sent();
-                    return [3 /*break*/, 6];
-                case 4: return [4 /*yield*/, response.text()];
+                    _c.trys.push([3, 12, , 13]);
+                    console.log('Trying endpoint:', endpoint);
+                    headers = {
+                        'Content-Type': 'application/json'
+                    };
+                    // Add auth token if available
+                    if (token) {
+                        headers['Authorization'] = "Bearer " + token;
+                    }
+                    return [4 /*yield*/, fetch(endpoint, { headers: headers })];
+                case 4:
+                    response = _c.sent();
+                    console.log('Response status for', endpoint, ':', response.status);
+                    if (!response.ok) return [3 /*break*/, 8];
+                    contentType = response.headers.get('content-type');
+                    if (!(contentType === null || contentType === void 0 ? void 0 : contentType.includes('application/json'))) return [3 /*break*/, 6];
+                    return [4 /*yield*/, response.json()];
                 case 5:
-                    _a = _d.sent();
-                    _d.label = 6;
+                    data = _c.sent();
+                    console.log('Received data from', endpoint, ':', data);
+                    return [2 /*return*/, data];
                 case 6:
-                    errorData = _a;
+                    console.log('Non-JSON response from', endpoint);
+                    return [3 /*break*/, 13];
+                case 7: return [3 /*break*/, 11];
+                case 8:
+                    if (!(response.status === 404)) return [3 /*break*/, 9];
+                    console.log('Endpoint not found:', endpoint);
+                    lastError = new Error("Endpoint " + endpoint + " not found");
+                    return [3 /*break*/, 13]; // Try next endpoint
+                case 9: return [4 /*yield*/, response.text()];
+                case 10:
+                    errorData = _c.sent();
                     console.error('API Error Response:', {
+                        endpoint: endpoint,
                         status: response.status,
                         statusText: response.statusText,
                         error: errorData
                     });
-                    // No need to return default metrics here as the backend handles that
-                    throw new Error(typeof errorData === 'object' && errorData.error
-                        ? errorData.error
-                        : "HTTP error! status: " + response.status);
-                case 7:
-                    if (!(contentType === null || contentType === void 0 ? void 0 : contentType.includes('application/json'))) {
-                        throw new Error('Invalid response format from server');
-                    }
-                    return [4 /*yield*/, response.json()];
-                case 8:
-                    data = _d.sent();
-                    return [2 /*return*/, data];
-                case 9:
-                    error_1 = _d.sent();
+                    lastError = new Error("HTTP error! status: " + response.status);
+                    return [3 /*break*/, 13]; // Try next endpoint
+                case 11: return [3 /*break*/, 13];
+                case 12:
+                    fetchError_1 = _c.sent();
+                    console.error('Fetch error for', endpoint, ':', fetchError_1);
+                    lastError = fetchError_1;
+                    return [3 /*break*/, 13]; // Try next endpoint
+                case 13:
+                    _i++;
+                    return [3 /*break*/, 2];
+                case 14:
+                    // If all endpoints fail, return default metrics
+                    console.log('All API endpoints failed, returning default metrics. Last error:', lastError);
+                    return [2 /*return*/, {
+                            id: "metrics-" + userId,
+                            user_id: userId,
+                            daily_limit: 5,
+                            chats_used: 0,
+                            is_pro: false,
+                            last_updated: new Date().toISOString(),
+                            created_at: new Date().toISOString()
+                        }];
+                case 15:
+                    error_1 = _c.sent();
                     console.error('Failed to fetch user metrics:', error_1);
-                    throw error_1;
-                case 10: return [2 /*return*/];
+                    // Return default metrics as fallback
+                    return [2 /*return*/, {
+                            id: "metrics-" + userId,
+                            user_id: userId,
+                            daily_limit: 5,
+                            chats_used: 0,
+                            is_pro: false,
+                            last_updated: new Date().toISOString(),
+                            created_at: new Date().toISOString()
+                        }];
+                case 16: return [2 /*return*/];
             }
         });
     }); },
@@ -250,28 +294,69 @@ exports.api = {
         });
     }); },
     updateChatMetrics: function (userId) { return __awaiter(void 0, void 0, Promise, function () {
-        var response, error_2;
+        var endpoints, _i, endpoints_2, endpoint, response, contentType, fetchError_2, error_2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
-                    _a.trys.push([0, 2, , 3]);
-                    return [4 /*yield*/, fetch("/api/user/metrics?user_id=" + userId, {
+                    _a.trys.push([0, 9, , 10]);
+                    endpoints = [
+                        "/api/user/metrics?user_id=" + userId,
+                        "/api/user/metrics-simple?user_id=" + userId
+                    ];
+                    _i = 0, endpoints_2 = endpoints;
+                    _a.label = 1;
+                case 1:
+                    if (!(_i < endpoints_2.length)) return [3 /*break*/, 8];
+                    endpoint = endpoints_2[_i];
+                    _a.label = 2;
+                case 2:
+                    _a.trys.push([2, 6, , 7]);
+                    return [4 /*yield*/, fetch(endpoint, {
                             method: 'GET',
                             headers: {
                                 'Content-Type': 'application/json'
                             }
                         })];
-                case 1:
+                case 3:
                     response = _a.sent();
-                    if (!response.ok) {
-                        throw new Error('Failed to update chat metrics');
-                    }
-                    return [2 /*return*/, response.json()];
-                case 2:
+                    if (!response.ok) return [3 /*break*/, 5];
+                    contentType = response.headers.get('content-type');
+                    if (!(contentType === null || contentType === void 0 ? void 0 : contentType.includes('application/json'))) return [3 /*break*/, 5];
+                    return [4 /*yield*/, response.json()];
+                case 4: return [2 /*return*/, _a.sent()];
+                case 5: return [3 /*break*/, 7];
+                case 6:
+                    fetchError_2 = _a.sent();
+                    console.error('Fetch error for', endpoint, ':', fetchError_2);
+                    return [3 /*break*/, 7];
+                case 7:
+                    _i++;
+                    return [3 /*break*/, 1];
+                case 8: 
+                // If all endpoints fail, return default metrics
+                return [2 /*return*/, {
+                        id: "metrics-" + userId,
+                        user_id: userId,
+                        daily_limit: 5,
+                        chats_used: 0,
+                        is_pro: false,
+                        last_updated: new Date().toISOString(),
+                        created_at: new Date().toISOString()
+                    }];
+                case 9:
                     error_2 = _a.sent();
                     console.error('Failed to update chat metrics:', error_2);
-                    throw error_2;
-                case 3: return [2 /*return*/];
+                    // Return default metrics as fallback
+                    return [2 /*return*/, {
+                            id: "metrics-" + userId,
+                            user_id: userId,
+                            daily_limit: 5,
+                            chats_used: 0,
+                            is_pro: false,
+                            last_updated: new Date().toISOString(),
+                            created_at: new Date().toISOString()
+                        }];
+                case 10: return [2 /*return*/];
             }
         });
     }); },

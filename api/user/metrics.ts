@@ -1,16 +1,30 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-// Create Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ffvvesrqtdktayjwurwm.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmdnZlc3JxdGRrdGF5and1cndtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUzODAxMDksImV4cCI6MjA2MDk1NjEwOX0._zC7055iriJSN3-HUTj71Bn_-auGn1WfrWDwqLPPUU4';
+// Create Supabase client with environment variables
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Log environment status
+console.log('Supabase config status:', {
+  hasSupabaseUrl: !!supabaseUrl,
+  hasSupabaseKey: !!supabaseKey,
+  supabaseUrlPrefix: supabaseUrl?.substring(0, 30) + '...',
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL: !!process.env.VERCEL
+});
+
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Add detailed logging for debugging
+  console.log('User Metrics API Route Hit:', req.method, req.url);
+  console.log('Query params:', req.query);
+  console.log('Supabase client available:', !!supabase);
+  
   // Handle CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -19,12 +33,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method !== 'GET') {
+    console.log('Method not allowed:', req.method);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
     const userId = req.query.user_id as string;
+    console.log('User ID from query:', userId);
+    
     if (!userId) {
+      console.log('Missing user ID');
       return res.status(400).json({ error: 'User ID is required' });
     }
 
@@ -38,6 +56,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       last_updated: new Date().toISOString(),
       created_at: new Date().toISOString()
     };
+
+    // If Supabase is not available, return default metrics
+    if (!supabase) {
+      console.log('Supabase client not available, returning default metrics');
+      return res.status(200).json(defaultMetrics);
+    }
 
     // Try to get metrics from Supabase first (handle no rows gracefully)
     let supabaseMetrics: {
@@ -94,10 +118,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Use Supabase metrics if available, otherwise use defaults
     const metrics = supabaseMetrics || defaultMetrics;
-
-    res.json(metrics);
+    
+    console.log('Returning metrics:', metrics);
+    res.status(200).json(metrics);
   } catch (error) {
     console.error('Error fetching user metrics:', error);
-    res.status(500).json({ error: 'Failed to fetch user metrics' });
+    res.status(500).json({ 
+      error: 'Failed to fetch user metrics',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }

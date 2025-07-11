@@ -87,14 +87,23 @@ const Dashboard = () => {
       try {
         if (!user) return;
         
+        console.log('Dashboard: Fetching metrics for user:', user.id);
         const metricsData = await api.getChatLimits(user.id);
+        console.log('Dashboard: Received metrics data:', metricsData);
+        
         setMetrics({
           dailyLimit: metricsData.daily_limit || 5,
           chatsUsed: metricsData.chats_used || 0,
           remaining: (metricsData.daily_limit || 5) - (metricsData.chats_used || 0)
         });
       } catch (err) {
-        console.error('Error fetching metrics:', err);
+        console.error('Dashboard: Error fetching metrics:', err);
+        // Set default metrics on error to avoid blocking the dashboard
+        setMetrics({
+          dailyLimit: 5,
+          chatsUsed: 0,
+          remaining: 5
+        });
       }
     };
 

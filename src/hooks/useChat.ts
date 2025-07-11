@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Message, ChatSession, ChatHistory } from "@/lib/types";
+import type { ChatHistoryMessage } from "../../api/_supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
@@ -71,33 +72,29 @@ export function useChat() {
 
     const fetchLimits = async () => {
       try {
+        console.log('Fetching chat limits for user:', user.id);
         const metrics = await api.getChatLimits(user.id);
         if (metrics) {
           console.log('Received metrics:', metrics);
           setChatLimits({
-            dailyLimit: metrics.dailyLimit || 5,
-            chatsUsedToday: metrics.chatsUsed || 0,
-            isProUser: metrics.isPro || false
+            dailyLimit: metrics.daily_limit || 5,
+            chatsUsedToday: metrics.chats_used || 0,
+            isProUser: metrics.is_pro || false
           });
         } else {
-          // This assumes the API returns null/undefined for a new user (e.g., on a 404).
-          // This is a much safer pattern than catching all errors.
-          try {
-            console.log('Creating initial metrics for new user:', user.id);
-            await api.updateChatMetrics(user.id);
-            setChatLimits({ dailyLimit: 5, chatsUsedToday: 0, isProUser: false });
-          } catch (err) {
-            console.error('Failed to create initial metrics:', err);
-            setError("We couldn't set up your account's usage limits. Please try again later.");
-          }
+          // Fallback to default limits
+          console.log('No metrics received, using defaults');
+          setChatLimits({ dailyLimit: 5, chatsUsedToday: 0, isProUser: false });
         }
       } catch (error: any) {
-        if (error instanceof SyntaxError && error.message.includes("Unexpected token '<'")) {
-          console.error('Failed to fetch chat limits: The server returned an HTML error page instead of JSON. This is a server-side issue.', error);
-          setError("A server error occurred while fetching your data. Please try again later.");
-        } else {
-          console.error('Failed to fetch chat limits with an unexpected error:', error);
-          setError("An unexpected error occurred while fetching your data.");
+        console.error('Failed to fetch chat limits:', error);
+        
+        // Always set default limits on error to avoid blocking the app
+        setChatLimits({ dailyLimit: 5, chatsUsedToday: 0, isProUser: false });
+        
+        // Only show error for non-API connectivity issues
+        if (error?.message && !error.message.includes('404') && !error.message.includes('fetch')) {
+          setError("Couldn't load your usage data. Using default limits for now.");
         }
       }
     };
@@ -113,7 +110,8 @@ export function useChat() {
       // Save chat history with proper structure
       await api.saveChat({
         userId: user.id,
-        messages: messages.filter(m => m.id !== "0-ai") // Don't save welcome message
+        message: messages.filter(m => m.id !== "0-ai").map(m => m.text).join('\n'), // Combine messages as a single string
+        response: messages.filter(m => m.sender === "bot" && m.id !== "0-ai").map(m => m.text).join('\n') // Combine bot responses
       });
     } catch (error) {
       console.error('Error updating chat metrics:', error);
@@ -202,7 +200,7 @@ export function useChat() {
         setChatLimits(prev => ({
           ...prev,
           chatsUsedToday: result.chatsUsed,
-          dailyLimit: result.dailyLimit || prev.dailyLimit
+          dailyLimit: result.dailyLimit || prev.dailyLimit // This line is correct if result comes from ChatResponse, but if you use UserMetrics, use daily_limit
         }));
 
         // Update localStorage
@@ -322,15 +320,59 @@ export function useChat() {
       try {
         if (!user?.id) return;
         const response = await api.getChatHistory(user.id);
-        // Transform the chat history into ChatSession format
-        const sessions = response.map((chat: ChatHistory) => ({
-          id: chat.id,
-          title: chat.title || 'Chat',
-          lastMessage: chat.messages[chat.messages.length - 1]?.text || '',
-          updatedAt: new Date(chat.timestamp || Date.now()),
-          messageCount: chat.messages.length,
-          messages: chat.messages
-        }));
+        
+        // Group ChatHistoryMessage[] by session_id to create ChatSession[]
+        const sessionMap = new Map<string, ChatSession>();
+        
+        response.forEach((chatMessage: ChatHistoryMessage) => {
+          const sessionId = chatMessage.session_id;
+          
+          if (!sessionMap.has(sessionId)) {
+            const newSession: ChatSession = {
+              id: sessionId,
+              sessionId: sessionId,
+              title: 'Chat Session',
+              lastMessage: '',
+              updatedAt: new Date(chatMessage.created_at),
+              messageCount: 0,
+              messages: []
+            };
+            sessionMap.set(sessionId, newSession);
+          }
+          
+          const session = sessionMap.get(sessionId)!;
+          
+          // Add user message
+          if (session.messages) {
+            session.messages.push({
+              id: `${chatMessage.id}-user`,
+              text: chatMessage.message,
+              sender: 'user',
+              type: 'user',
+              timestamp: new Date(chatMessage.created_at).getTime(),
+              metadata: chatMessage.metadata
+            });
+            
+            // Add bot response
+            session.messages.push({
+              id: `${chatMessage.id}-bot`,
+              text: chatMessage.response,
+              sender: 'bot',
+              type: 'ai',
+              timestamp: new Date(chatMessage.created_at).getTime() + 1,
+              metadata: chatMessage.metadata
+            });
+          }
+          
+          session.messageCount = session.messages?.length || 0;
+          session.lastMessage = chatMessage.response || chatMessage.message;
+          session.updatedAt = new Date(chatMessage.updated_at || chatMessage.created_at);
+        });
+        
+        const sessions = Array.from(sessionMap.values()).sort((a, b) => 
+          b.updatedAt.getTime() - a.updatedAt.getTime()
+        );
+        
         setChatSessions(sessions);
       } catch (error: any) {
         if (error instanceof SyntaxError && error.message.includes("Unexpected token '<'")) {

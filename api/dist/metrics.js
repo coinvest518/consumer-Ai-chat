@@ -40,25 +40,14 @@ var supabase_js_1 = require("@supabase/supabase-js");
 // Create Supabase client with environment variables
 var supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 var supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-// Log environment status
-console.log('Supabase config status:', {
-    hasSupabaseUrl: !!supabaseUrl,
-    hasSupabaseKey: !!supabaseKey,
-    supabaseUrlPrefix: (supabaseUrl === null || supabaseUrl === void 0 ? void 0 : supabaseUrl.substring(0, 30)) + '...',
-    NODE_ENV: process.env.NODE_ENV,
-    VERCEL: !!process.env.VERCEL
-});
-var supabase = supabaseUrl && supabaseKey ? supabase_js_1.createClient(supabaseUrl, supabaseKey) : null;
 function handler(req, res) {
     return __awaiter(this, void 0, void 0, function () {
-        var userId, defaultMetrics, supabaseMetrics, _a, data, error, rawMetrics, error_1, _b, data, error, error_2, metrics, error_3;
-        return __generator(this, function (_c) {
-            switch (_c.label) {
+        var userId, defaultMetrics, supabase, _a, data, error, rawMetrics, supabaseMetrics, error_1, error_2;
+        return __generator(this, function (_b) {
+            switch (_b.label) {
                 case 0:
-                    // Add detailed logging for debugging
-                    console.log('User Metrics API Route Hit:', req.method, req.url);
+                    console.log('Metrics API route hit:', req.method, req.url);
                     console.log('Query params:', req.query);
-                    console.log('Supabase client available:', !!supabase);
                     // Handle CORS
                     res.setHeader('Access-Control-Allow-Origin', '*');
                     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -71,9 +60,9 @@ function handler(req, res) {
                         console.log('Method not allowed:', req.method);
                         return [2 /*return*/, res.status(405).json({ error: 'Method not allowed' })];
                     }
-                    _c.label = 1;
+                    _b.label = 1;
                 case 1:
-                    _c.trys.push([1, 10, , 11]);
+                    _b.trys.push([1, 6, , 7]);
                     userId = req.query.user_id;
                     console.log('User ID from query:', userId);
                     if (!userId) {
@@ -89,27 +78,22 @@ function handler(req, res) {
                         last_updated: new Date().toISOString(),
                         created_at: new Date().toISOString()
                     };
-                    // If Supabase is not available, return default metrics
-                    if (!supabase) {
-                        console.log('Supabase client not available, returning default metrics');
-                        return [2 /*return*/, res.status(200).json(defaultMetrics)];
-                    }
-                    supabaseMetrics = null;
-                    _c.label = 2;
+                    if (!(supabaseUrl && supabaseKey)) return [3 /*break*/, 5];
+                    supabase = supabase_js_1.createClient(supabaseUrl, supabaseKey);
+                    _b.label = 2;
                 case 2:
-                    _c.trys.push([2, 4, , 5]);
+                    _b.trys.push([2, 4, , 5]);
                     return [4 /*yield*/, supabase
                             .from('user_metrics')
                             .select('*')
                             .eq('user_id', userId)];
                 case 3:
-                    _a = _c.sent(), data = _a.data, error = _a.error;
+                    _a = _b.sent(), data = _a.data, error = _a.error;
                     if (error) {
                         console.error('Supabase metrics query error:', error);
                     }
                     else if (data && data.length > 0) {
                         rawMetrics = data[0];
-                        // Map Supabase fields to expected format
                         supabaseMetrics = {
                             id: rawMetrics.id,
                             user_id: rawMetrics.user_id,
@@ -119,46 +103,27 @@ function handler(req, res) {
                             last_updated: rawMetrics.last_updated || rawMetrics.updated_at,
                             created_at: rawMetrics.created_at
                         };
+                        console.log('Returning Supabase metrics:', supabaseMetrics);
+                        return [2 /*return*/, res.status(200).json(supabaseMetrics)];
                     }
                     return [3 /*break*/, 5];
                 case 4:
-                    error_1 = _c.sent();
+                    error_1 = _b.sent();
                     console.error('Supabase metrics fetch error:', error_1);
                     return [3 /*break*/, 5];
                 case 5:
-                    if (!!supabaseMetrics) return [3 /*break*/, 9];
-                    _c.label = 6;
+                    console.log('Returning default metrics:', defaultMetrics);
+                    res.status(200).json(defaultMetrics);
+                    return [3 /*break*/, 7];
                 case 6:
-                    _c.trys.push([6, 8, , 9]);
-                    return [4 /*yield*/, supabase
-                            .from('user_metrics')
-                            .insert([defaultMetrics])
-                            .select()
-                            .single()];
-                case 7:
-                    _b = _c.sent(), data = _b.data, error = _b.error;
-                    if (!error && data) {
-                        supabaseMetrics = data;
-                    }
-                    return [3 /*break*/, 9];
-                case 8:
-                    error_2 = _c.sent();
-                    console.error('Supabase metrics creation error:', error_2);
-                    return [3 /*break*/, 9];
-                case 9:
-                    metrics = supabaseMetrics || defaultMetrics;
-                    console.log('Returning metrics:', metrics);
-                    res.status(200).json(metrics);
-                    return [3 /*break*/, 11];
-                case 10:
-                    error_3 = _c.sent();
-                    console.error('Error fetching user metrics:', error_3);
+                    error_2 = _b.sent();
+                    console.error('Error fetching user metrics:', error_2);
                     res.status(500).json({
                         error: 'Failed to fetch user metrics',
-                        details: error_3 instanceof Error ? error_3.message : 'Unknown error'
+                        details: error_2 instanceof Error ? error_2.message : 'Unknown error'
                     });
-                    return [3 /*break*/, 11];
-                case 11: return [2 /*return*/];
+                    return [3 /*break*/, 7];
+                case 7: return [2 /*return*/];
             }
         });
     });

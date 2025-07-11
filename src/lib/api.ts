@@ -25,46 +25,90 @@ export const api = {
       const session = await supabase.auth.getSession();
       const token = session?.data?.session?.access_token;
       
-      if (!token) {
-        throw new Error('No authentication token available');
-      }
-
-      const response = await fetch(`/api/user/metrics?user_id=${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const contentType = response.headers.get('content-type');
-      if (!response.ok) {
-        const errorData = contentType?.includes('application/json') 
-          ? await response.json() 
-          : await response.text();
+      console.log('Fetching chat limits for user:', userId);
+      console.log('Auth token available:', !!token);
+      
+      // Try multiple endpoints in order of preference
+      const endpoints = [
+        `/api/user/metrics?user_id=${userId}`,
+        `/api/user/metrics-simple?user_id=${userId}`
+      ];
+      
+      let lastError = null;
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log('Trying endpoint:', endpoint);
           
-        console.error('API Error Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          // Add auth token if available
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          
+          const response = await fetch(endpoint, { headers });
 
-        // No need to return default metrics here as the backend handles that
-        throw new Error(
-          typeof errorData === 'object' && errorData.error 
-            ? errorData.error 
-            : `HTTP error! status: ${response.status}`
-        );
+          console.log('Response status for', endpoint, ':', response.status);
+          
+          if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            if (contentType?.includes('application/json')) {
+              const data = await response.json();
+              console.log('Received data from', endpoint, ':', data);
+              return data;
+            } else {
+              console.log('Non-JSON response from', endpoint);
+              continue;
+            }
+          } else if (response.status === 404) {
+            console.log('Endpoint not found:', endpoint);
+            lastError = new Error(`Endpoint ${endpoint} not found`);
+            continue; // Try next endpoint
+          } else {
+            const errorData = await response.text();
+            console.error('API Error Response:', {
+              endpoint,
+              status: response.status,
+              statusText: response.statusText,
+              error: errorData
+            });
+            lastError = new Error(`HTTP error! status: ${response.status}`);
+            continue; // Try next endpoint
+          }
+        } catch (fetchError) {
+          console.error('Fetch error for', endpoint, ':', fetchError);
+          lastError = fetchError;
+          continue; // Try next endpoint
+        }
       }
-
-      if (!contentType?.includes('application/json')) {
-        throw new Error('Invalid response format from server');
-      }
-
-      const data = await response.json();
-      return data;
+      
+      // If all endpoints fail, return default metrics
+      console.log('All API endpoints failed, returning default metrics. Last error:', lastError);
+      return {
+        id: `metrics-${userId}`,
+        user_id: userId,
+        daily_limit: 5,
+        chats_used: 0,
+        is_pro: false,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
     } catch (error) {
       console.error('Failed to fetch user metrics:', error);
-      throw error;
+      
+      // Return default metrics as fallback
+      return {
+        id: `metrics-${userId}`,
+        user_id: userId,
+        daily_limit: 5,
+        chats_used: 0,
+        is_pro: false,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
     }
   },
 
@@ -200,23 +244,55 @@ export const api = {
 
   updateChatMetrics: async (userId: string): Promise<UserMetrics> => {
     try {
-      // For now, this can be a simple function that increments usage
-      // The backend will handle creating/updating metrics
-      const response = await fetch(`/api/user/metrics?user_id=${userId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Use the same fallback pattern as getChatLimits
+      const endpoints = [
+        `/api/user/metrics?user_id=${userId}`,
+        `/api/user/metrics-simple?user_id=${userId}`
+      ];
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
 
-      if (!response.ok) {
-        throw new Error('Failed to update chat metrics');
+          if (response.ok) {
+            const contentType = response.headers.get('content-type');
+            if (contentType?.includes('application/json')) {
+              return await response.json();
+            }
+          }
+        } catch (fetchError) {
+          console.error('Fetch error for', endpoint, ':', fetchError);
+          continue;
+        }
       }
-
-      return response.json();
+      
+      // If all endpoints fail, return default metrics
+      return {
+        id: `metrics-${userId}`,
+        user_id: userId,
+        daily_limit: 5,
+        chats_used: 0,
+        is_pro: false,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
     } catch (error) {
       console.error('Failed to update chat metrics:', error);
-      throw error;
+      // Return default metrics as fallback
+      return {
+        id: `metrics-${userId}`,
+        user_id: userId,
+        daily_limit: 5,
+        chats_used: 0,
+        is_pro: false,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
     }
   },
 
