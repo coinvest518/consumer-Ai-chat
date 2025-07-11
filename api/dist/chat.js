@@ -58,9 +58,15 @@ function handler(req, res) {
                         'http://localhost:3000'
                     ];
                     origin = req.headers.origin;
+                    console.log('Incoming CORS origin:', origin);
                     if (origin && allowedOrigins.includes(origin)) {
                         res.setHeader('Access-Control-Allow-Origin', origin);
                     }
+                    else {
+                        // For debugging, always set to '*' if not matched (remove for production)
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+                    }
+                    res.setHeader('Vary', 'Origin');
                     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
                     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
                     res.setHeader('Access-Control-Allow-Credentials', 'true');

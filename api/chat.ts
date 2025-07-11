@@ -17,20 +17,22 @@ interface ChatRequest {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Handle CORS with specific origins
+  // Robust CORS: always set headers, log incoming origin for debugging
   const allowedOrigins = [
     'https://consumerai.info',
     'https://www.consumerai.info',
     'http://localhost:5173',
     'http://localhost:3000'
   ];
-  
   const origin = req.headers.origin;
-  
+  console.log('Incoming CORS origin:', origin);
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    // For debugging, always set to '*' if not matched (remove for production)
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
