@@ -138,101 +138,109 @@ export function useChat() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          message: userInput,
-          sessionId: messages[0]?.id || Date.now().toString(),
-          userId: user?.id
-        })
-      });
+    const maxRetries = 3;
+    let retryCount = 0;
 
+    while (retryCount < maxRetries) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      if (!response.ok) {
-        let errorData: any = {};
-        try {
-          errorData = await response.json();
-        } catch (jsonErr) {
-          // If response is not JSON or empty, fallback to text
-          try {
-            const errorText = await response.text();
-            // Check if the server returned an HTML page, which is a common sign of a server-side error.
-            if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html')) {
-              errorData = { error: `Server Error: Received an HTML page instead of JSON. Status: ${response.status}` };
-            } else {
-              errorData = { error: errorText || 'The server returned an empty error response.' };
-            }
-          } catch {
-            errorData = { error: `API request failed with status ${response.status}` };
-          }
+        const response = await fetch(`${API_BASE_URL}/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          signal: controller.signal,
+          body: JSON.stringify({ 
+            message: userInput,
+            sessionId: messages[0]?.id || Date.now().toString(),
+            userId: user?.id
+          })
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.message || 
+            `Server error: ${response.status} ${response.statusText}`
+          );
         }
-        if (response.status === 504 || (errorData && typeof errorData === 'object' && 'isTimeout' in errorData && errorData.isTimeout)) {
-          throw new Error('The AI is taking longer than expected to respond. Please try again.');
+
+        const result = await response.json() as ChatResponse;
+        
+        // Validate the response format
+        if (!result || typeof result.text !== 'string') {
+          throw new Error('Invalid response format from server');
         }
-        throw new Error((errorData && typeof errorData === 'object' && 'error' in errorData && errorData.error) ? errorData.error : `API request failed with status ${response.status}`);
-      }
 
-      const result = await response.json() as ChatResponse;
-      
-      // Validate the response format
-      if (!result || typeof result.text !== 'string') {
-        throw new Error('Invalid response format from server');
-      }
+        const botMessage: Message = {
+          id: Date.now().toString() + '-bot',
+          text: result.text,
+          sender: "bot",
+          type: "ai",
+          timestamp: Date.now(),
+          citation: result.citation,
+          actions: result.actions
+        };
 
-      const botMessage: Message = {
-        id: Date.now().toString() + '-bot',
-        text: result.text,
-        sender: "bot",
-        type: "ai",
-        timestamp: Date.now(),
-        citation: result.citation,
-        actions: result.actions
-      };
+        setMessages((prevMessages) => [...prevMessages, botMessage]);
 
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
-
-      // Update chat count with server response
-      if (typeof result.chatsUsed === 'number') {
-        setChatLimits(prev => ({
-          ...prev,
-          chatsUsedToday: result.chatsUsed,
-          dailyLimit: result.dailyLimit || prev.dailyLimit // This line is correct if result comes from ChatResponse, but if you use UserMetrics, use daily_limit
-        }));
-
-        // Update localStorage
-        if (user?.id) {
-          localStorage.setItem(`chatLimits-${user.id}`, JSON.stringify({
-            dailyLimit: result.dailyLimit,
+        // Update chat count with server response
+        if (typeof result.chatsUsed === 'number') {
+          setChatLimits(prev => ({
+            ...prev,
             chatsUsedToday: result.chatsUsed,
-            lastUpdated: new Date().toISOString()
+            dailyLimit: result.dailyLimit || prev.dailyLimit
           }));
         }
+
+        // Update metrics after successful message
+        await updateChatMetrics();
+        break; // Success - exit retry loop
+
+      } catch (err: any) {
+        retryCount++;
+        
+        if (err.name === 'AbortError') {
+          if (retryCount === maxRetries) {
+            setError('Request timed out. Please try again.');
+            console.error("Request timeout after all retries");
+          }
+          continue; // Try again if we have retries left
+        }
+
+        console.error("Error sending message:", err);
+        
+        if (retryCount === maxRetries) {
+          let errorMessage = 'Network error. Please check your connection and try again.';
+          if (err.message.includes('Failed to fetch')) {
+            errorMessage = 'Unable to reach the server. Please check your internet connection.';
+          }
+          setError(errorMessage);
+          
+          // Add error message to chat
+            const errorBotMessage: Message = {
+            id: Date.now().toString() + '-error',
+            text: errorMessage,
+            sender: "bot",
+            type: "system",
+            timestamp: Date.now()
+            };
+          setMessages(prev => [...prev, errorBotMessage]);
+        } else {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
+          continue;
+        }
       }
-
-      // Update metrics after successful message
-      await updateChatMetrics();
-
-    } catch (err: any) {
-      console.error("Error sending message:", err);
-      setError(err.message || "An unexpected error occurred");
-      
-      // Add a fallback error message to the chat
-      const errorMessage: Message = {
-        id: Date.now().toString() + '-error',
-        text: "I apologize, but I encountered an error processing your request. Please try again.",
-        sender: "bot",
-        type: "ai",
-        timestamp: Date.now()
-      };
-      setMessages((prevMessages) => [...prevMessages, errorMessage]);
-    } finally {
-      setIsLoading(false);
     }
-  }, [chatLimits, messages, updateChatMetrics]);
+    
+    setIsLoading(false);
+  }, [chatLimits, messages, updateChatMetrics, API_BASE_URL, user]);
 
   const clearChat = useCallback(() => {
     setMessages([

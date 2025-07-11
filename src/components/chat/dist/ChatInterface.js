@@ -162,50 +162,36 @@ function ChatInterface(_a) {
                     setInputValue("");
                     _a.label = 1;
                 case 1:
-                    _a.trys.push([1, 5, , 6]);
-                    // Show progress steps
-                    setCurrentStep('understanding');
-                    setProgress(0);
-                    return [4 /*yield*/, new Promise(function (r) { return setTimeout(r, 1000); })];
+                    _a.trys.push([1, 5, 6, 7]);
+                    setCurrentStep("understanding");
+                    return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, 500); })];
                 case 2:
                     _a.sent();
-                    setCurrentStep('processing');
-                    setProgress(33);
-                    return [4 /*yield*/, new Promise(function (r) { return setTimeout(r, 1000); })];
+                    setCurrentStep("processing");
+                    return [4 /*yield*/, onSendMessage(messageText)];
                 case 3:
                     _a.sent();
-                    setCurrentStep('generating');
-                    setProgress(66);
-                    // Send actual message
-                    return [4 /*yield*/, onSendMessage(messageText)];
+                    setCurrentStep("generating");
+                    return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, 500); })];
                 case 4:
-                    // Send actual message
                     _a.sent();
-                    setProgress(100);
                     setCurrentStep(null);
-                    return [3 /*break*/, 6];
+                    return [3 /*break*/, 7];
                 case 5:
                     error_1 = _a.sent();
-                    console.error('Error:', error_1);
+                    console.error("Chat error:", error_1);
+                    toast({
+                        title: "Error",
+                        description: error_1.message || "Failed to send message. Please try again.",
+                        variant: "destructive"
+                    });
+                    // Add the unsent message back to the input
+                    setInputValue(messageText);
+                    return [3 /*break*/, 7];
+                case 6:
                     setCurrentStep(null);
-                    setProgress(0);
-                    // Check if error is specific to credit limit
-                    if (error_1 instanceof Error && error_1.message === 'Credit limit reached') {
-                        toast({
-                            title: "Daily Limit Reached",
-                            description: "You've used all your credits. Purchase more to continue chatting.",
-                            variant: "destructive"
-                        });
-                    }
-                    else {
-                        toast({
-                            title: "Error",
-                            description: error_1 instanceof Error ? error_1.message : "An unexpected error occurred",
-                            variant: "destructive"
-                        });
-                    }
-                    return [3 /*break*/, 6];
-                case 6: return [2 /*return*/];
+                    return [7 /*endfinally*/];
+                case 7: return [2 /*return*/];
             }
         });
     }); };

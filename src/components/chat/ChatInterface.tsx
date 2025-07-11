@@ -140,43 +140,29 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
     setInputValue("");
 
     try {
-      // Show progress steps
-      setCurrentStep('understanding');
-      setProgress(0);
-      await new Promise(r => setTimeout(r, 1000));
+      setCurrentStep("understanding");
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      setCurrentStep('processing');
-      setProgress(33);
-      await new Promise(r => setTimeout(r, 1000));
-      
-      setCurrentStep('generating');
-      setProgress(66);
-      
-      // Send actual message
+      setCurrentStep("processing");
       await onSendMessage(messageText);
       
-      setProgress(100);
-      setCurrentStep(null);
+      setCurrentStep("generating");
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-    } catch (error) {
-      console.error('Error:', error);
       setCurrentStep(null);
-      setProgress(0);
+    } catch (error: any) {
+      console.error("Chat error:", error);
       
-      // Check if error is specific to credit limit
-      if (error instanceof Error && error.message === 'Credit limit reached') {
-        toast({
-          title: "Daily Limit Reached",
-          description: "You've used all your credits. Purchase more to continue chatting.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "An unexpected error occurred",
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message. Please try again.",
+        variant: "destructive"
+      });
+
+      // Add the unsent message back to the input
+      setInputValue(messageText);
+    } finally {
+      setCurrentStep(null);
     }
   };
 
@@ -434,7 +420,8 @@ export default function ChatInterface({ messages, onSendMessage, isLoading, show
             messages.map((message, index) => (
               <ChatMessage key={message.id || index} message={message} />
             ))
-          )}
+          )
+          }
           {currentStep && AI_STEPS[currentStep] && (
             <div className={`flex items-center gap-2 p-3 bg-gray-100 rounded-lg border-l-4 ${AI_STEPS[currentStep].color}`}>
               {(() => {
