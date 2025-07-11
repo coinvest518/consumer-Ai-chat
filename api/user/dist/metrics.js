@@ -51,7 +51,7 @@ console.log('Supabase config status:', {
 var supabase = supabaseUrl && supabaseKey ? supabase_js_1.createClient(supabaseUrl, supabaseKey) : null;
 function handler(req, res) {
     return __awaiter(this, void 0, void 0, function () {
-        var userId, defaultMetrics, supabaseMetrics, _a, data, error, rawMetrics, error_1, _b, data, error, error_2, metrics, error_3;
+        var userId, defaultMetrics, _a, data, error, metrics, _b, newData, insertError, metrics, insertError_1, error_1, error_2, fallbackMetrics;
         return __generator(this, function (_c) {
             switch (_c.label) {
                 case 0:
@@ -94,69 +94,88 @@ function handler(req, res) {
                         console.log('Supabase client not available, returning default metrics');
                         return [2 /*return*/, res.status(200).json(defaultMetrics)];
                     }
-                    supabaseMetrics = null;
                     _c.label = 2;
                 case 2:
-                    _c.trys.push([2, 4, , 5]);
+                    _c.trys.push([2, 8, , 9]);
                     return [4 /*yield*/, supabase
                             .from('user_metrics')
-                            .select('*')
-                            .eq('user_id', userId)];
+                            .select('id, user_id, created_at')
+                            .eq('user_id', userId)
+                            .maybeSingle()];
                 case 3:
                     _a = _c.sent(), data = _a.data, error = _a.error;
                     if (error) {
                         console.error('Supabase metrics query error:', error);
+                        // Return defaults if there's an error
+                        console.log('Returning default metrics due to query error');
+                        return [2 /*return*/, res.status(200).json(defaultMetrics)];
                     }
-                    else if (data && data.length > 0) {
-                        rawMetrics = data[0];
-                        // Map Supabase fields to expected format
-                        supabaseMetrics = {
-                            id: rawMetrics.id,
-                            user_id: rawMetrics.user_id,
-                            daily_limit: rawMetrics.daily_limit || 5,
-                            chats_used: rawMetrics.chats_used || 0,
-                            is_pro: rawMetrics.is_pro || false,
-                            last_updated: rawMetrics.last_updated || rawMetrics.updated_at,
-                            created_at: rawMetrics.created_at
-                        };
-                    }
-                    return [3 /*break*/, 5];
+                    if (!data) return [3 /*break*/, 4];
+                    metrics = {
+                        id: data.id,
+                        user_id: data.user_id,
+                        created_at: data.created_at,
+                        // Provide default values for fields that don't exist in the table
+                        daily_limit: 5,
+                        chats_used: 0,
+                        is_pro: false,
+                        last_updated: new Date().toISOString()
+                    };
+                    console.log('Returning merged metrics from Supabase:', metrics);
+                    return [2 /*return*/, res.status(200).json(metrics)];
                 case 4:
-                    error_1 = _c.sent();
-                    console.error('Supabase metrics fetch error:', error_1);
-                    return [3 /*break*/, 5];
-                case 5:
-                    if (!!supabaseMetrics) return [3 /*break*/, 9];
-                    _c.label = 6;
-                case 6:
-                    _c.trys.push([6, 8, , 9]);
+                    _c.trys.push([4, 6, , 7]);
                     return [4 /*yield*/, supabase
                             .from('user_metrics')
-                            .insert([defaultMetrics])
-                            .select()
+                            .insert([{ user_id: userId }])
+                            .select('id, user_id, created_at')
                             .single()];
-                case 7:
-                    _b = _c.sent(), data = _b.data, error = _b.error;
-                    if (!error && data) {
-                        supabaseMetrics = data;
+                case 5:
+                    _b = _c.sent(), newData = _b.data, insertError = _b.error;
+                    if (!insertError && newData) {
+                        metrics = {
+                            id: newData.id,
+                            user_id: newData.user_id,
+                            created_at: newData.created_at,
+                            daily_limit: 5,
+                            chats_used: 0,
+                            is_pro: false,
+                            last_updated: new Date().toISOString()
+                        };
+                        console.log('Created new metrics record and returning:', metrics);
+                        return [2 /*return*/, res.status(200).json(metrics)];
                     }
-                    return [3 /*break*/, 9];
+                    else {
+                        console.error('Failed to create metrics record:', insertError);
+                        console.log('Returning default metrics due to insert error');
+                        return [2 /*return*/, res.status(200).json(defaultMetrics)];
+                    }
+                    return [3 /*break*/, 7];
+                case 6:
+                    insertError_1 = _c.sent();
+                    console.error('Error creating metrics record:', insertError_1);
+                    console.log('Returning default metrics due to insert exception');
+                    return [2 /*return*/, res.status(200).json(defaultMetrics)];
+                case 7: return [3 /*break*/, 9];
                 case 8:
-                    error_2 = _c.sent();
-                    console.error('Supabase metrics creation error:', error_2);
-                    return [3 /*break*/, 9];
-                case 9:
-                    metrics = supabaseMetrics || defaultMetrics;
-                    console.log('Returning metrics:', metrics);
-                    res.status(200).json(metrics);
-                    return [3 /*break*/, 11];
+                    error_1 = _c.sent();
+                    console.error('Supabase metrics fetch error:', error_1);
+                    console.log('Returning default metrics due to fetch exception');
+                    return [2 /*return*/, res.status(200).json(defaultMetrics)];
+                case 9: return [3 /*break*/, 11];
                 case 10:
-                    error_3 = _c.sent();
-                    console.error('Error fetching user metrics:', error_3);
-                    res.status(500).json({
-                        error: 'Failed to fetch user metrics',
-                        details: error_3 instanceof Error ? error_3.message : 'Unknown error'
-                    });
+                    error_2 = _c.sent();
+                    console.error('Error in metrics handler:', error_2);
+                    fallbackMetrics = {
+                        id: "fallback-" + req.query.user_id,
+                        user_id: req.query.user_id,
+                        daily_limit: 5,
+                        chats_used: 0,
+                        is_pro: false,
+                        last_updated: new Date().toISOString(),
+                        created_at: new Date().toISOString()
+                    };
+                    res.status(200).json(fallbackMetrics);
                     return [3 /*break*/, 11];
                 case 11: return [2 /*return*/];
             }

@@ -17,8 +17,19 @@ export interface ChatMessage {
   timestamp?: string;
 }
 
-// User metrics type
+// User metrics type - aligned with frontend expectations
 export interface UserMetrics {
+  id: string;
+  user_id: string;
+  daily_limit: number;
+  chats_used: number;
+  is_pro: boolean;
+  last_updated: string;
+  created_at: string;
+}
+
+// Legacy user metrics type for Astra DB (backwards compatibility)
+export interface LegacyUserMetrics {
   userId: string;
   questionsAsked: number;
   questionsRemaining: number;

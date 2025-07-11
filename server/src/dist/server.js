@@ -121,7 +121,7 @@ app["delete"]('/api/chat/sessions', function (_, res) {
 });
 // User metrics endpoint
 app.get('/api/user/metrics', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
-    var userId, defaultMetrics, supabaseMetrics, _a, data, error, error_2, astraMetrics, astraCollection, error_3, metrics, error_4;
+    var userId, defaultMetrics, supabaseMetrics, _a, data, error, error_2, astraMetrics, astraCollection, legacyMetrics, error_3, finalMetrics, error_4;
     return __generator(this, function (_b) {
         switch (_b.label) {
             case 0:
@@ -131,12 +131,13 @@ app.get('/api/user/metrics', function (req, res) { return __awaiter(void 0, void
                     return [2 /*return*/, res.status(400).json({ error: 'User ID is required' })];
                 }
                 defaultMetrics = {
-                    userId: userId,
-                    questionsAsked: 0,
-                    questionsRemaining: 5,
-                    isPro: false,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
+                    id: "metrics-" + userId,
+                    user_id: userId,
+                    daily_limit: 5,
+                    chats_used: 0,
+                    is_pro: false,
+                    last_updated: new Date().toISOString(),
+                    created_at: new Date().toISOString()
                 };
                 supabaseMetrics = null;
                 _b.label = 1;
@@ -171,10 +172,18 @@ app.get('/api/user/metrics', function (req, res) { return __awaiter(void 0, void
             case 7:
                 astraMetrics = _b.sent();
                 if (!!astraMetrics) return [3 /*break*/, 9];
-                return [4 /*yield*/, astra_js_1.updateUserMetrics(userId, defaultMetrics)];
+                legacyMetrics = {
+                    userId: userId,
+                    questionsAsked: 0,
+                    questionsRemaining: 5,
+                    isPro: false,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                return [4 /*yield*/, astra_js_1.updateUserMetrics(userId, legacyMetrics)];
             case 8:
-                _b.sent();
-                astraMetrics = defaultMetrics;
+                _b.sent(); // Legacy format for Astra
+                astraMetrics = legacyMetrics;
                 _b.label = 9;
             case 9: return [3 /*break*/, 11];
             case 10:
@@ -182,8 +191,32 @@ app.get('/api/user/metrics', function (req, res) { return __awaiter(void 0, void
                 console.error('Astra metrics error:', error_3);
                 return [3 /*break*/, 11];
             case 11:
-                metrics = supabaseMetrics || astraMetrics || defaultMetrics;
-                res.json(metrics);
+                finalMetrics = defaultMetrics;
+                if (supabaseMetrics) {
+                    // Transform Supabase data to expected format
+                    finalMetrics = {
+                        id: supabaseMetrics.id || "metrics-" + userId,
+                        user_id: supabaseMetrics.user_id || userId,
+                        daily_limit: supabaseMetrics.daily_limit || 5,
+                        chats_used: supabaseMetrics.chats_used || 0,
+                        is_pro: supabaseMetrics.is_pro || false,
+                        last_updated: supabaseMetrics.last_updated || new Date().toISOString(),
+                        created_at: supabaseMetrics.created_at || new Date().toISOString()
+                    };
+                }
+                else if (astraMetrics) {
+                    // Transform legacy Astra data to expected format
+                    finalMetrics = {
+                        id: astraMetrics._id || "metrics-" + userId,
+                        user_id: astraMetrics.userId || userId,
+                        daily_limit: astraMetrics.questionsRemaining || 5,
+                        chats_used: astraMetrics.questionsAsked || 0,
+                        is_pro: astraMetrics.isPro || false,
+                        last_updated: astraMetrics.updatedAt || new Date().toISOString(),
+                        created_at: astraMetrics.createdAt || new Date().toISOString()
+                    };
+                }
+                res.json(finalMetrics);
                 return [3 /*break*/, 13];
             case 12:
                 error_4 = _b.sent();

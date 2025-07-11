@@ -1,6 +1,6 @@
 import { DataAPIClient } from "@datastax/astra-db-ts";
 import { v4 as uuidv4 } from 'uuid';
-import { ChatMessage, UserMetrics, EmailMessage, ScheduledEmail } from '../types';
+import { ChatMessage, UserMetrics, LegacyUserMetrics, EmailMessage, ScheduledEmail } from '../types';
 
 // Initialize the client with your token
 const ASTRA_DB_APPLICATION_TOKEN = process.env.ASTRA_DB_APPLICATION_TOKEN;
@@ -210,8 +210,8 @@ export const getChatSessionMessages = async (sessionId: string): Promise<ChatMes
   }
 };
 
-// Update user metrics
-export const updateUserMetrics = async (userId: string, metrics: Partial<UserMetrics>) => {
+// Update user metrics (using legacy format for Astra)
+export const updateUserMetrics = async (userId: string, metrics: Partial<LegacyUserMetrics>) => {
   try {
     const collection = await getUserMetricsCollection();
     const existingMetrics = await collection.findOne({ userId });
@@ -226,8 +226,8 @@ export const updateUserMetrics = async (userId: string, metrics: Partial<UserMet
       );
       return true;
     } else {
-      // Create a new metrics document with defaults
-      const newMetrics: UserMetrics = {
+      // Create a new metrics document with defaults (legacy format)
+      const newMetrics: LegacyUserMetrics = {
         userId,
         questionsAsked: metrics.questionsAsked || 0,
         questionsRemaining: metrics.questionsRemaining || 5,

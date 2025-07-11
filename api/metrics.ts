@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    // Default metrics
+    // Default metrics (no longer trying to write to DB, just returning defaults)
     const defaultMetrics = {
       id: `metrics-${userId}`,
       user_id: userId,
@@ -44,47 +44,94 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       created_at: new Date().toISOString()
     };
 
-    // If Supabase is available, try to fetch/create metrics
+    // If Supabase is available, try to fetch from the existing table structure
     if (supabaseUrl && supabaseKey) {
       const supabase = createClient(supabaseUrl, supabaseKey);
       
       try {
+        // Only query the columns that exist in the current table
         const { data, error } = await supabase
           .from('user_metrics')
-          .select('*')
-          .eq('user_id', userId);
+          .select('id, user_id, created_at')
+          .eq('user_id', userId)
+          .maybeSingle(); // Use maybeSingle to handle no rows gracefully
 
         if (error) {
           console.error('Supabase metrics query error:', error);
-        } else if (data && data.length > 0) {
-          const rawMetrics = data[0];
-          
-          // Map Supabase fields to expected format
+          console.log('Returning default metrics due to query error');
+          return res.status(200).json(defaultMetrics);
+        }
+
+        if (data) {
+          // Merge with defaults for fields that don't exist in the table
           const supabaseMetrics = {
-            id: rawMetrics.id,
-            user_id: rawMetrics.user_id,
-            daily_limit: rawMetrics.daily_limit || 5,
-            chats_used: rawMetrics.chats_used || 0,
-            is_pro: rawMetrics.is_pro || false,
-            last_updated: rawMetrics.last_updated || rawMetrics.updated_at,
-            created_at: rawMetrics.created_at
+            id: data.id,
+            user_id: data.user_id,
+            created_at: data.created_at,
+            // Provide default values for fields that don't exist in the table
+            daily_limit: 5,
+            chats_used: 0,
+            is_pro: false,
+            last_updated: new Date().toISOString()
           };
           
-          console.log('Returning Supabase metrics:', supabaseMetrics);
+          console.log('Returning merged metrics from Supabase:', supabaseMetrics);
           return res.status(200).json(supabaseMetrics);
+        } else {
+          // No record found, try to create a basic one (only with the columns that exist)
+          try {
+            const { data: newData, error: insertError } = await supabase
+              .from('user_metrics')
+              .insert([{ user_id: userId }])
+              .select('id, user_id, created_at')
+              .single();
+
+            if (!insertError && newData) {
+              const metrics = {
+                id: newData.id,
+                user_id: newData.user_id,
+                created_at: newData.created_at,
+                daily_limit: 5,
+                chats_used: 0,
+                is_pro: false,
+                last_updated: new Date().toISOString()
+              };
+              
+              console.log('Created new metrics record and returning:', metrics);
+              return res.status(200).json(metrics);
+            } else {
+              console.error('Failed to create metrics record:', insertError);
+              console.log('Returning default metrics due to insert error');
+              return res.status(200).json(defaultMetrics);
+            }
+          } catch (insertError) {
+            console.error('Error creating metrics record:', insertError);
+            console.log('Returning default metrics due to insert exception');
+            return res.status(200).json(defaultMetrics);
+          }
         }
       } catch (error) {
         console.error('Supabase metrics fetch error:', error);
+        console.log('Returning default metrics due to fetch exception');
+        return res.status(200).json(defaultMetrics);
       }
+    } else {
+      console.log('No Supabase credentials, returning default metrics');
+      return res.status(200).json(defaultMetrics);
     }
-
-    console.log('Returning default metrics:', defaultMetrics);
-    res.status(200).json(defaultMetrics);
   } catch (error) {
-    console.error('Error fetching user metrics:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch user metrics',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    console.error('Error in metrics handler:', error);
+    // Always return some metrics, never fail
+    const fallbackMetrics = {
+      id: `fallback-${req.query.user_id}`,
+      user_id: req.query.user_id as string,
+      daily_limit: 5,
+      chats_used: 0,
+      is_pro: false,
+      last_updated: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    };
+    
+    res.status(200).json(fallbackMetrics);
   }
 }

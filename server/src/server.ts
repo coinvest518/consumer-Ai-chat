@@ -96,14 +96,15 @@ app.get('/api/user/metrics', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    // Default metrics
+    // Default metrics - using frontend expected field names
     const defaultMetrics = {
-      userId,
-      questionsAsked: 0,
-      questionsRemaining: 5,
-      isPro: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      id: `metrics-${userId}`,
+      user_id: userId,
+      daily_limit: 5,
+      chats_used: 0,
+      is_pro: false,
+      last_updated: new Date().toISOString(),
+      created_at: new Date().toISOString()
     };
 
     // Try to get metrics from Supabase first (handle no rows gracefully)
@@ -129,19 +130,51 @@ app.get('/api/user/metrics', async (req: Request, res: Response) => {
       const astraCollection = await getUserMetricsCollection();
       astraMetrics = await astraCollection.findOne({ userId });
 
-      // If no metrics in Astra, create them
+      // If no metrics in Astra, create them with legacy format
       if (!astraMetrics) {
-        await updateUserMetrics(userId, defaultMetrics);
-        astraMetrics = defaultMetrics;
+        const legacyMetrics = {
+          userId,
+          questionsAsked: 0,
+          questionsRemaining: 5,
+          isPro: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        await updateUserMetrics(userId, legacyMetrics as any); // Legacy format for Astra
+        astraMetrics = legacyMetrics;
       }
     } catch (error) {
       console.error('Astra metrics error:', error);
     }
 
     // Use Supabase metrics if available, otherwise use Astra, otherwise use defaults
-    const metrics = supabaseMetrics || astraMetrics || defaultMetrics;
+    let finalMetrics = defaultMetrics;
 
-    res.json(metrics);
+    if (supabaseMetrics) {
+      // Transform Supabase data to expected format
+      finalMetrics = {
+        id: supabaseMetrics.id || `metrics-${userId}`,
+        user_id: supabaseMetrics.user_id || userId,
+        daily_limit: supabaseMetrics.daily_limit || 5,
+        chats_used: supabaseMetrics.chats_used || 0,
+        is_pro: supabaseMetrics.is_pro || false,
+        last_updated: supabaseMetrics.last_updated || new Date().toISOString(),
+        created_at: supabaseMetrics.created_at || new Date().toISOString()
+      };
+    } else if (astraMetrics) {
+      // Transform legacy Astra data to expected format
+      finalMetrics = {
+        id: astraMetrics._id || `metrics-${userId}`,
+        user_id: astraMetrics.userId || userId,
+        daily_limit: astraMetrics.questionsRemaining || 5,
+        chats_used: astraMetrics.questionsAsked || 0,
+        is_pro: astraMetrics.isPro || false,
+        last_updated: astraMetrics.updatedAt || new Date().toISOString(),
+        created_at: astraMetrics.createdAt || new Date().toISOString()
+      };
+    }
+
+    res.json(finalMetrics);
   } catch (error) {
     console.error('Error fetching user metrics:', error);
     res.status(500).json({ error: 'Failed to fetch user metrics' });
