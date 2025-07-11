@@ -2,17 +2,22 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/src/dispute-ai.ts",
+      "src": "src/server.ts",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "dist/src/dispute-ai.ts"
+      "dest": "src/server.ts"
     }
   ],
   "env": {
-    "OPENAI_API_KEY": "@openai_api_key"
+    "OPENAI_API_KEY": "@openai_api_key",
+    "ASTRA_DB_APPLICATION_TOKEN": "@astra_db_application_token",
+    "ASTRA_DB_ENDPOINT": "@astra_db_endpoint",
+    "SUPABASE_URL": "@supabase_url",
+    "SUPABASE_KEY": "@supabase_key",
+    "FLOW_ID": "@flow_id"
   }
 }
