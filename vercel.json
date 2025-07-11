@@ -1,40 +1,22 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "@vercel/node@3.1.5"
-    }
-  },
   "builds": [
+    {
+      "src": "server/src/server.ts",
+      "use": "@vercel/node"
+    },
     {
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist",
-        "zeroConfig": true
+        "distDir": "dist"
       }
     }
   ],
   "routes": [
     {
-      "src": "/api/user/metrics",
-      "dest": "/api/user/metrics.ts"
-    },
-    {
-      "src": "/api/metrics",
-      "dest": "/api/metrics.ts"
-    },
-    {
-      "src": "/api/debug",
-      "dest": "/api/debug.ts"
-    },
-    {
-      "src": "/api/health",
-      "dest": "/api/health.ts"
-    },
-    {
       "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "dest": "server/src/server.ts"
     },
     {
       "handle": "filesystem"
@@ -43,5 +25,13 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "OPENAI_API_KEY": "@openai_api_key",
+    "ASTRA_DB_APPLICATION_TOKEN": "@astra_db_application_token",
+    "ASTRA_DB_ENDPOINT": "@astra_db_endpoint",
+    "SUPABASE_URL": "@supabase_url",
+    "SUPABASE_KEY": "@supabase_key",
+    "FLOW_ID": "@flow_id"
+  }
 }

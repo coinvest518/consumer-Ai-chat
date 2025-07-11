@@ -1,14 +1,13 @@
 {
   "name": "dispute-ai-server",
   "version": "1.0.0",
-  "description": "DisputeAI - Credit Dispute Automation System",
+  "description": "DisputeAI - Credit Dispute Automation System", 
   "type": "module",
-  "main": "dist/src/dispute-ai.js",
+  "main": "dist/src/server.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/src/server.js",
-    "dev": "tsx src/server.ts",
-    "vercel-build": "npm run build"
+    "dev": "tsx src/server.ts"
   },
   "keywords": [],
   "author": "",
