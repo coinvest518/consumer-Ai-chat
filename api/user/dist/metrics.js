@@ -51,7 +51,7 @@ console.log('Supabase config status:', {
 var supabase = supabaseUrl && supabaseKey ? supabase_js_1.createClient(supabaseUrl, supabaseKey) : null;
 function handler(req, res) {
     return __awaiter(this, void 0, void 0, function () {
-        var userId, defaultMetrics, _a, data, error, metrics, _b, newData, insertError, metrics, insertError_1, error_1, error_2, fallbackMetrics;
+        var allowedOrigins, origin, userId, defaultMetrics, _a, data, error, metrics, _b, newData, insertError, metrics, insertError_1, error_1, error_2, fallbackMetrics;
         return __generator(this, function (_c) {
             switch (_c.label) {
                 case 0:
@@ -59,10 +59,14 @@ function handler(req, res) {
                     console.log('User Metrics API Route Hit:', req.method, req.url);
                     console.log('Query params:', req.query);
                     console.log('Supabase client available:', !!supabase);
-                    // Handle CORS
-                    res.setHeader('Access-Control-Allow-Origin', '*');
-                    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-                    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                    allowedOrigins = ['https://consumerai.info', 'https://www.consumerai.info'];
+                    origin = req.headers.origin;
+                    if (origin && allowedOrigins.includes(origin)) {
+                        res.setHeader('Access-Control-Allow-Origin', origin);
+                        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                        res.setHeader('Access-Control-Allow-Credentials', 'true');
+                    }
                     if (req.method === 'OPTIONS') {
                         res.status(200).end();
                         return [2 /*return*/];

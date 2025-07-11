@@ -11,6 +11,9 @@ const base = '/';
 
 export default defineConfig({
   base,
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.VERCEL ? 'production' : 'development')
+  },
   plugins: [react()],
   resolve: {
     alias: {
@@ -34,7 +37,27 @@ export default defineConfig({
     // Ensure assets are properly handled with the correct base path
     assetsDir: 'assets',
     emptyOutDir: true,
-    minify: true
+    minify: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor chunk
+          if (id.includes('node_modules')) {
+            if (id.includes('react')) {
+              return 'vendor-react';
+            }
+            return 'vendor';
+          }
+          // UI components chunk
+          if (id.includes('src/components/ui/')) {
+            const filename = id.split('/').pop()?.split('.')[0];
+            if (filename) {
+              return `ui-${filename}`;
+            }
+          }
+        }
+      }
+    }
   },
   envPrefix: 'VITE_'
-}); 
+});

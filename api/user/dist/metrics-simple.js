@@ -38,12 +38,16 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 exports.__esModule = true;
 function handler(req, res) {
     return __awaiter(this, void 0, void 0, function () {
-        var userId, defaultMetrics;
+        var allowedOrigins, origin, userId, defaultMetrics;
         return __generator(this, function (_a) {
-            // Handle CORS
-            res.setHeader('Access-Control-Allow-Origin', '*');
-            res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            allowedOrigins = ['https://consumerai.info', 'https://www.consumerai.info'];
+            origin = req.headers.origin;
+            if (origin && allowedOrigins.includes(origin)) {
+                res.setHeader('Access-Control-Allow-Origin', origin);
+                res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                res.setHeader('Access-Control-Allow-Credentials', 'true');
+            }
             if (req.method === 'OPTIONS') {
                 res.status(200).end();
                 return [2 /*return*/];

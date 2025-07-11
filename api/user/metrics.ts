@@ -22,10 +22,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('Query params:', req.query);
   console.log('Supabase client available:', !!supabase);
   
-  // Handle CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Handle CORS with specific origins
+  const allowedOrigins = ['https://consumerai.info', 'https://www.consumerai.info'];
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
