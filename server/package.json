@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/src/server.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npm install --legacy-peer-deps && tsc",
     "start": "node dist/src/server.js",
     "dev": "tsx src/server.ts"
   },
