@@ -12,8 +12,8 @@ interface ChatRequest {
   userId: string;
 }
 
-// Load environment variables from parent directory (root .env)
-config({ path: '../.env' });
+// Load environment variables from server root directory
+config();
 
 // Ensure we have access to environment variables with both naming conventions
 // For server-side code, use non-VITE variables if available, otherwise fall back to VITE ones

@@ -42,8 +42,8 @@ var dotenv_1 = require("dotenv");
 var dispute_ai_js_1 = require("./dispute-ai.js");
 var astra_js_1 = require("../db/astra.js");
 var supabase_js_1 = require("../db/supabase.js");
-// Load environment variables from parent directory (root .env)
-dotenv_1.config({ path: '../.env' });
+// Load environment variables from server root directory
+dotenv_1.config();
 // Ensure we have access to environment variables with both naming conventions
 // For server-side code, use non-VITE variables if available, otherwise fall back to VITE ones
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY;
