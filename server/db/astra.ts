@@ -1,6 +1,6 @@
 import { DataAPIClient } from "@datastax/astra-db-ts";
 import { v4 as uuidv4 } from 'uuid';
-import { ChatMessage, UserMetrics, LegacyUserMetrics, EmailMessage, ScheduledEmail } from '../types';
+import { ChatMessage, LegacyUserMetrics, EmailMessage, ScheduledEmail } from '../types';
 
 // Initialize the client with your token
 const ASTRA_DB_APPLICATION_TOKEN = process.env.ASTRA_DB_APPLICATION_TOKEN;
