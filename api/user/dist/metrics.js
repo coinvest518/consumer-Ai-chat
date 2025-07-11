@@ -59,14 +59,23 @@ function handler(req, res) {
                     console.log('User Metrics API Route Hit:', req.method, req.url);
                     console.log('Query params:', req.query);
                     console.log('Supabase client available:', !!supabase);
-                    allowedOrigins = ['https://consumerai.info', 'https://www.consumerai.info'];
+                    allowedOrigins = [
+                        'https://consumerai.info',
+                        'https://www.consumerai.info',
+                        'http://localhost:5173',
+                        'http://localhost:3000'
+                    ];
                     origin = req.headers.origin;
                     if (origin && allowedOrigins.includes(origin)) {
                         res.setHeader('Access-Control-Allow-Origin', origin);
-                        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-                        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-                        res.setHeader('Access-Control-Allow-Credentials', 'true');
                     }
+                    else {
+                        // Allow all origins in development
+                        res.setHeader('Access-Control-Allow-Origin', '*');
+                    }
+                    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                    res.setHeader('Access-Control-Allow-Credentials', 'true');
                     if (req.method === 'OPTIONS') {
                         res.status(200).end();
                         return [2 /*return*/];

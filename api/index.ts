@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { expressAdapter } from './express-adapter';
-import { callAgentAPI, clearChatSessionMemory, clearAllChatSessionMemories } from '../server/src/dispute-ai';
+import { callAgentAPI, clearChatSessionMemory, clearAllChatSessionMemories } from './_dispute-ai';
 import { createClient } from '@supabase/supabase-js';
 
 const app = express();

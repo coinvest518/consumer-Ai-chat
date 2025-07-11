@@ -40,18 +40,32 @@ export default defineConfig({
     minify: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': [
-            'react',
-            'react-dom',
-            'react-router-dom',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-label',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-menubar',
-            '@radix-ui/react-separator'
-          ]
+        manualChunks: (id) => {
+          // Vendor chunks
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'react-vendor';
+            }
+            if (id.includes('@radix-ui')) {
+              return 'radix-vendor';
+            }
+            if (id.includes('lucide-react')) {
+              return 'icons-vendor';
+            }
+            return 'vendor';
+          }
+          
+          // Only chunk specific file patterns, avoid directories
+          if (id.includes('/src/components/') && id.endsWith('.tsx') && !id.includes('/src/components/ui/')) {
+            return 'components';
+          }
+          
+          // Explicitly avoid chunking UI components
+          if (id.includes('/src/components/ui/')) {
+            return undefined;
+          }
+          
+          return undefined;
         }
       }
     }

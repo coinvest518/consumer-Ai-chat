@@ -43,7 +43,7 @@ process.env.ASTRA_DB_ENDPOINT = process.env.ASTRA_DB_ENDPOINT || process.env.VIT
 process.env.FLOW_ID = process.env.FLOW_ID || process.env.VITE_FLOW_ID;
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 process.env.SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-var dispute_ai_1 = require("../server/src/dispute-ai");
+var _dispute_ai_1 = require("./_dispute-ai");
 function handler(req, res) {
     var _a;
     return __awaiter(this, void 0, void 0, function () {
@@ -94,7 +94,7 @@ function handler(req, res) {
                         messageLength: message.length,
                         timestamp: new Date().toISOString()
                     });
-                    return [4 /*yield*/, dispute_ai_1.callAgentAPI(message, sessionId, userId)];
+                    return [4 /*yield*/, _dispute_ai_1.callAgentAPI(message, sessionId, userId)];
                 case 2:
                     response = _c.sent();
                     // Add response logging
