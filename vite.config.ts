@@ -33,7 +33,8 @@ export default defineConfig({
     sourcemap: true,
     // Ensure assets are properly handled with the correct base path
     assetsDir: 'assets',
-    emptyOutDir: true
+    emptyOutDir: true,
+    minify: true
   },
   envPrefix: 'VITE_'
 }); 
