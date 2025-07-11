@@ -12,7 +12,8 @@ const base = '/';
 export default defineConfig({
   base,
   define: {
-    'process.env.NODE_ENV': JSON.stringify(process.env.VERCEL ? 'production' : 'development')
+    'process.env.NODE_ENV': JSON.stringify(process.env.VERCEL ? 'production' : 'development'),
+    global: 'globalThis'
   },
   plugins: [react()],
   resolve: {
@@ -39,12 +40,16 @@ export default defineConfig({
     emptyOutDir: true,
     minify: true,
     rollupOptions: {
+      external: [],
       output: {
         manualChunks: (id) => {
           // Vendor chunks
           if (id.includes('node_modules')) {
             if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
               return 'react-vendor';
+            }
+            if (id.includes('framer-motion')) {
+              return 'framer-vendor';
             }
             if (id.includes('@radix-ui')) {
               return 'radix-vendor';
@@ -71,7 +76,7 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom']
+    include: ['react', 'react-dom', 'react-router-dom', 'framer-motion']
   },
   envPrefix: 'VITE_'
 });
