@@ -40,24 +40,24 @@ export default defineConfig({
     minify: true,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          // Vendor chunk
-          if (id.includes('node_modules')) {
-            if (id.includes('react')) {
-              return 'vendor-react';
-            }
-            return 'vendor';
-          }
-          // UI components chunk
-          if (id.includes('src/components/ui/')) {
-            const filename = id.split('/').pop()?.split('.')[0];
-            if (filename) {
-              return `ui-${filename}`;
-            }
-          }
+        manualChunks: {
+          'react-vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-label',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-menubar',
+            '@radix-ui/react-separator'
+          ]
         }
       }
     }
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom']
   },
   envPrefix: 'VITE_'
 });
