@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "dist/src/dispute-ai.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "dist/src/dispute-ai.ts"
+    }
+  ],
+  "env": {
+    "OPENAI_API_KEY": "@openai_api_key"
+  }
+}

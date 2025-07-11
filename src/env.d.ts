@@ -5,9 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY: string
   readonly VITE_ASTRA_DB_APPLICATION_TOKEN: string
   readonly VITE_ASTRA_DB_ENDPOINT: string
-  readonly VITE_LANGFLOW_API_URL: string
-  readonly VITE_LANGFLOW_API_KEY: string
-  readonly VITE_FLOW_ID: string
   readonly VITE_API_BASE_URL: string
 }
 

@@ -1,18 +1,23 @@
 /**
  * Base API URL for backend requests
- * Use VITE_API_BASE_URL environment variable or fallback to /api
+ * In development: Use /api (proxied by Vite to localhost:3000)
+ * In production: Use VITE_API_BASE_URL environment variable
  */
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+export const API_BASE_URL = import.meta.env.DEV 
+  ? '/api' 
+  : (import.meta.env.VITE_API_BASE_URL || '/api');
 
 /**
  * Log environment state during initialization
  */
 console.log('Environment:', {
   isProd: import.meta.env.PROD,
+  isDev: import.meta.env.DEV,
   baseUrl: API_BASE_URL,
   deploymentUrl: import.meta.env.BASE_URL,
   hasSupabaseUrl: !!import.meta.env.VITE_SUPABASE_URL,
   hasAstraToken: !!import.meta.env.VITE_ASTRA_DB_APPLICATION_TOKEN,
+  viteApiBaseUrl: import.meta.env.VITE_API_BASE_URL,
 });
 
 /**

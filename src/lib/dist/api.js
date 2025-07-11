@@ -53,27 +53,62 @@ function handleSupabaseResponse(_a) {
 }
 exports.api = {
     getChatLimits: function (userId) { return __awaiter(void 0, void 0, Promise, function () {
-        var _a, data, error;
-        return __generator(this, function (_b) {
-            switch (_b.label) {
-                case 0: return [4 /*yield*/, supabase_1.supabase
-                        .from('user_metrics')
-                        .select('*')
-                        .eq('user_id', userId)
-                        .single()];
+        var session, token, response, contentType, errorData, _a, data, error_1;
+        var _b, _c;
+        return __generator(this, function (_d) {
+            switch (_d.label) {
+                case 0:
+                    _d.trys.push([0, 9, , 10]);
+                    return [4 /*yield*/, supabase_1.supabase.auth.getSession()];
                 case 1:
-                    _a = _b.sent(), data = _a.data, error = _a.error;
-                    if (error && error.code !== 'PGRST116') {
-                        throw error;
+                    session = _d.sent();
+                    token = (_c = (_b = session === null || session === void 0 ? void 0 : session.data) === null || _b === void 0 ? void 0 : _b.session) === null || _c === void 0 ? void 0 : _c.access_token;
+                    if (!token) {
+                        throw new Error('No authentication token available');
                     }
-                    // Return default metrics if none exist
-                    return [2 /*return*/, data || {
-                            user_id: userId,
-                            daily_limit: 5,
-                            chats_used: 0,
-                            is_pro: false,
-                            last_updated: new Date().toISOString()
-                        }];
+                    return [4 /*yield*/, fetch("/api/user/metrics?user_id=" + userId, {
+                            headers: {
+                                'Authorization': "Bearer " + token,
+                                'Content-Type': 'application/json'
+                            }
+                        })];
+                case 2:
+                    response = _d.sent();
+                    contentType = response.headers.get('content-type');
+                    if (!!response.ok) return [3 /*break*/, 7];
+                    if (!(contentType === null || contentType === void 0 ? void 0 : contentType.includes('application/json'))) return [3 /*break*/, 4];
+                    return [4 /*yield*/, response.json()];
+                case 3:
+                    _a = _d.sent();
+                    return [3 /*break*/, 6];
+                case 4: return [4 /*yield*/, response.text()];
+                case 5:
+                    _a = _d.sent();
+                    _d.label = 6;
+                case 6:
+                    errorData = _a;
+                    console.error('API Error Response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        error: errorData
+                    });
+                    // No need to return default metrics here as the backend handles that
+                    throw new Error(typeof errorData === 'object' && errorData.error
+                        ? errorData.error
+                        : "HTTP error! status: " + response.status);
+                case 7:
+                    if (!(contentType === null || contentType === void 0 ? void 0 : contentType.includes('application/json'))) {
+                        throw new Error('Invalid response format from server');
+                    }
+                    return [4 /*yield*/, response.json()];
+                case 8:
+                    data = _d.sent();
+                    return [2 /*return*/, data];
+                case 9:
+                    error_1 = _d.sent();
+                    console.error('Failed to fetch user metrics:', error_1);
+                    throw error_1;
+                case 10: return [2 /*return*/];
             }
         });
     }); },
@@ -214,6 +249,32 @@ exports.api = {
             }
         });
     }); },
+    updateChatMetrics: function (userId) { return __awaiter(void 0, void 0, Promise, function () {
+        var response, error_2;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    _a.trys.push([0, 2, , 3]);
+                    return [4 /*yield*/, fetch("/api/user/metrics?user_id=" + userId, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        })];
+                case 1:
+                    response = _a.sent();
+                    if (!response.ok) {
+                        throw new Error('Failed to update chat metrics');
+                    }
+                    return [2 /*return*/, response.json()];
+                case 2:
+                    error_2 = _a.sent();
+                    console.error('Failed to update chat metrics:', error_2);
+                    throw error_2;
+                case 3: return [2 /*return*/];
+            }
+        });
+    }); },
     getUserData: function (userId) { return __awaiter(void 0, void 0, Promise, function () {
         var _a, metrics, emails, purchases;
         return __generator(this, function (_b) {
@@ -239,11 +300,13 @@ exports.api = {
                     _a = _b.sent(), metrics = _a[0].data, emails = _a[1].data, purchases = _a[2].data;
                     return [2 /*return*/, {
                             metrics: metrics || {
+                                id: crypto.randomUUID(),
                                 user_id: userId,
                                 daily_limit: 5,
                                 chats_used: 0,
                                 is_pro: false,
-                                last_updated: new Date().toISOString()
+                                last_updated: new Date().toISOString(),
+                                created_at: new Date().toISOString()
                             },
                             emails: emails || [],
                             purchases: purchases || []

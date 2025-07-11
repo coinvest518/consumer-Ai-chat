@@ -21,24 +21,51 @@ async function handleSupabaseResponse<T>(
 
 export const api = {
   getChatLimits: async (userId: string): Promise<UserMetrics> => {
-    const { data, error } = await supabase
-      .from('user_metrics')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
+    try {
+      const session = await supabase.auth.getSession();
+      const token = session?.data?.session?.access_token;
       
-    if (error && error.code !== 'PGRST116') {
+      if (!token) {
+        throw new Error('No authentication token available');
+      }
+
+      const response = await fetch(`/api/user/metrics?user_id=${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const contentType = response.headers.get('content-type');
+      if (!response.ok) {
+        const errorData = contentType?.includes('application/json') 
+          ? await response.json() 
+          : await response.text();
+          
+        console.error('API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+
+        // No need to return default metrics here as the backend handles that
+        throw new Error(
+          typeof errorData === 'object' && errorData.error 
+            ? errorData.error 
+            : `HTTP error! status: ${response.status}`
+        );
+      }
+
+      if (!contentType?.includes('application/json')) {
+        throw new Error('Invalid response format from server');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Failed to fetch user metrics:', error);
       throw error;
     }
-
-    // Return default metrics if none exist
-    return data || {
-      user_id: userId,
-      daily_limit: 5,
-      chats_used: 0,
-      is_pro: false,
-      last_updated: new Date().toISOString()
-    };
   },
 
   getChatHistory: async (userId: string): Promise<ChatHistoryMessage[]> => {
@@ -171,6 +198,28 @@ export const api = {
     return response.json();
   },
 
+  updateChatMetrics: async (userId: string): Promise<UserMetrics> => {
+    try {
+      // For now, this can be a simple function that increments usage
+      // The backend will handle creating/updating metrics
+      const response = await fetch(`/api/user/metrics?user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update chat metrics');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Failed to update chat metrics:', error);
+      throw error;
+    }
+  },
+
   getUserData: async (userId: string): Promise<{
     metrics: UserMetrics;
     emails: Email[];
@@ -200,11 +249,13 @@ export const api = {
 
     return {
       metrics: metrics || {
+        id: crypto.randomUUID(),
         user_id: userId,
         daily_limit: 5,
         chats_used: 0,
         is_pro: false,
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString()
       },
       emails: emails || [],
       purchases: purchases || []
