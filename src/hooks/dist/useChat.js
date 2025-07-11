@@ -201,19 +201,20 @@ function useChat() {
                     maxRetries = 3;
                     retryCount = 0;
                     _loop_1 = function () {
-                        var controller_1, timeoutId, response, errorData, result_1, botMessage_1, err_1, errorMessage, errorBotMessage_1;
+                        var controller_1, timeoutId, response, errorData, result_1, botMessage_1, err_1, errorMessage, systemMessage_1;
                         return __generator(this, function (_a) {
                             switch (_a.label) {
                                 case 0:
                                     _a.trys.push([0, 6, , 10]);
                                     controller_1 = new AbortController();
                                     timeoutId = setTimeout(function () { return controller_1.abort(); }, 30000);
-                                    return [4 /*yield*/, fetch(config_1.API_BASE_URL + "/chat", {
+                                    return [4 /*yield*/, fetch(config_1.getApiUrl('/chat'), {
                                             method: 'POST',
                                             headers: {
                                                 'Content-Type': 'application/json',
                                                 'Accept': 'application/json'
                                             },
+                                            credentials: 'include',
                                             signal: controller_1.signal,
                                             body: JSON.stringify({
                                                 message: userInput,
@@ -269,19 +270,18 @@ function useChat() {
                                     }
                                     console.error("Error sending message:", err_1);
                                     if (!(retryCount === maxRetries)) return [3 /*break*/, 7];
-                                    errorMessage = 'Network error. Please check your connection and try again.';
-                                    if (err_1.message.includes('Failed to fetch')) {
-                                        errorMessage = 'Unable to reach the server. Please check your internet connection.';
-                                    }
+                                    errorMessage = err_1.message.includes('Failed to fetch')
+                                        ? 'Unable to reach the server. Please check your internet connection.'
+                                        : err_1.message || 'An unexpected error occurred';
                                     setError(errorMessage);
-                                    errorBotMessage_1 = {
-                                        id: Date.now().toString() + '-error',
+                                    systemMessage_1 = {
+                                        id: Date.now().toString() + '-system',
                                         text: errorMessage,
                                         sender: "bot",
                                         type: "system",
                                         timestamp: Date.now()
                                     };
-                                    setMessages(function (prev) { return __spreadArrays(prev, [errorBotMessage_1]); });
+                                    setMessages(function (prev) { return __spreadArrays(prev, [systemMessage_1]); });
                                     return [3 /*break*/, 9];
                                 case 7: 
                                 // Wait before retrying (exponential backoff)
@@ -309,7 +309,7 @@ function useChat() {
                     return [2 /*return*/];
             }
         });
-    }); }, [chatLimits, messages, updateChatMetrics, config_1.API_BASE_URL, user]);
+    }); }, [chatLimits, messages, updateChatMetrics, user]);
     var clearChat = react_1.useCallback(function () {
         setMessages([
             {

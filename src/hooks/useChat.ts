@@ -3,7 +3,7 @@ import { Message, ChatSession, ChatHistory } from "@/lib/types";
 import type { ChatHistoryMessage } from "../../api/_supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from '@/lib/api';
-import { API_BASE_URL } from '@/lib/config';
+import { getApiUrl } from '@/lib/config';
 
 interface ChatLimits {
   dailyLimit: number;
@@ -146,12 +146,13 @@ export function useChat() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-        const response = await fetch(`${API_BASE_URL}/chat`, {
+        const response = await fetch(getApiUrl('/chat'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
           },
+          credentials: 'include',
           signal: controller.signal,
           body: JSON.stringify({ 
             message: userInput,
@@ -216,21 +217,20 @@ export function useChat() {
         console.error("Error sending message:", err);
         
         if (retryCount === maxRetries) {
-          let errorMessage = 'Network error. Please check your connection and try again.';
-          if (err.message.includes('Failed to fetch')) {
-            errorMessage = 'Unable to reach the server. Please check your internet connection.';
-          }
+          const errorMessage = err.message.includes('Failed to fetch')
+            ? 'Unable to reach the server. Please check your internet connection.'
+            : err.message || 'An unexpected error occurred';
+
           setError(errorMessage);
           
-          // Add error message to chat
-            const errorBotMessage: Message = {
-            id: Date.now().toString() + '-error',
+          const systemMessage: Message = {
+            id: Date.now().toString() + '-system',
             text: errorMessage,
             sender: "bot",
             type: "system",
             timestamp: Date.now()
-            };
-          setMessages(prev => [...prev, errorBotMessage]);
+          };
+          setMessages(prev => [...prev, systemMessage]);
         } else {
           // Wait before retrying (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 1000));
@@ -240,7 +240,7 @@ export function useChat() {
     }
     
     setIsLoading(false);
-  }, [chatLimits, messages, updateChatMetrics, API_BASE_URL, user]);
+  }, [chatLimits, messages, updateChatMetrics, user]);
 
   const clearChat = useCallback(() => {
     setMessages([

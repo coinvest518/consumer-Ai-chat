@@ -17,11 +17,25 @@ interface ChatRequest {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Handle CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Handle CORS with specific origins
+  const allowedOrigins = [
+    'https://consumerai.info',
+    'https://www.consumerai.info',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  
+  const origin = req.headers.origin;
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -40,12 +54,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // Add request logging
+    console.log('Chat request received:', {
+      userId,
+      sessionId,
+      messageLength: message.length,
+      timestamp: new Date().toISOString()
+    });
+
     const response = await callAgentAPI(message, sessionId, userId);
+
+    // Add response logging
+    console.log('Chat response sent:', {
+      userId,
+      sessionId,
+      responseLength: response?.text?.length,
+      timestamp: new Date().toISOString()
+    });
+
     res.json(response);
   } catch (error) {
     console.error('Chat error:', error);
     res.status(500).json({ 
-      error: 'Internal server error' 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error occurred'
     });
   }
 }
