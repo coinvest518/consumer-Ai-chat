@@ -20,8 +20,13 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, './src'),
+      // Map all use-sync-external-store imports to React's built-in implementation
       "use-sync-external-store/shim": "react",
-      "use-sync-external-store": "react"
+      "use-sync-external-store/shim/with-selector": "react",
+      "use-sync-external-store": "react",
+      // Ensure radix-ui components use the same React instance
+      "react": path.resolve(__dirname, './node_modules/react'),
+      "react-dom": path.resolve(__dirname, './node_modules/react-dom')
     }
   },
   server: {
@@ -79,7 +84,24 @@ export default defineConfig({
     }
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'framer-motion']
+    include: [
+      'react', 
+      'react-dom', 
+      'react-router-dom', 
+      'framer-motion',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-avatar',
+      '@radix-ui/react-toggle',
+      '@radix-ui/react-toast'
+    ],
+    esbuildOptions: {
+      target: 'es2020',
+      supported: { 
+        'top-level-await': true 
+      },
+    }
   },
   envPrefix: 'VITE_'
 });
