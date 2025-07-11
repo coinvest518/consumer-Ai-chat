@@ -13,14 +13,16 @@ export default defineConfig({
   base,
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.VERCEL ? 'production' : 'development'),
-    global: 'globalThis'
+    global: 'globalThis',
+    'process.env': {}
   },
   plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, './src'),
-    },
-    dedupe: ['react', 'react-dom', 'use-sync-external-store']
+      "use-sync-external-store/shim": "react",
+      "use-sync-external-store": "react"
+    }
   },
   server: {
     port: 5173,
