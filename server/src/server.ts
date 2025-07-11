@@ -182,7 +182,7 @@ app.get('/api/user/metrics', async (req: Request, res: Response) => {
 });
 
 // Start server if not running in Vercel
-if (!process.env.VERCEL) {
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(port, () => {
     console.log(`Server running on port ${port}`);
   });

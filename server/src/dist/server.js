@@ -228,7 +228,7 @@ app.get('/api/user/metrics', function (req, res) { return __awaiter(void 0, void
     });
 }); });
 // Start server if not running in Vercel
-if (!process.env.VERCEL) {
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     app.listen(port, function () {
         console.log("Server running on port " + port);
     });
