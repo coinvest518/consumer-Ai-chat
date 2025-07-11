@@ -181,6 +181,30 @@ app.get('/api/user/metrics', async (req: Request, res: Response) => {
   }
 });
 
+// Simple user metrics endpoint
+app.get('/api/user/metrics-simple', async (req: Request, res: Response) => {
+  try {
+    const userId = req.query.user_id as string;
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Return simple default metrics
+    return res.status(200).json({
+      id: `metrics-${userId}`,
+      user_id: userId,
+      daily_limit: 5,
+      chats_used: 0,
+      is_pro: false,
+      last_updated: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error in metrics-simple:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Start server if not running in Vercel
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(port, () => {

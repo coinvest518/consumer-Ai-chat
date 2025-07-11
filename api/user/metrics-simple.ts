@@ -1,25 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { setupResponse } from '../express-adapter';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Handle CORS with specific origins
-  const allowedOrigins = [
-    'https://consumerai.info', 
-    'https://www.consumerai.info',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ];
-  const origin = req.headers.origin;
-  
-  if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
-    // Allow all origins in development
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Set up standardized response headers
+  setupResponse(req, res);
 
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -35,8 +21,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    // Return simple default metrics for now
-    const defaultMetrics = {
+    // Return simple default metrics
+    return res.status(200).json({
       id: `metrics-${userId}`,
       user_id: userId,
       daily_limit: 5,
@@ -44,11 +30,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       is_pro: false,
       last_updated: new Date().toISOString(),
       created_at: new Date().toISOString()
-    };
-
-    res.json(defaultMetrics);
+    });
   } catch (error) {
-    console.error('Error fetching user metrics:', error);
-    res.status(500).json({ error: 'Failed to fetch user metrics' });
+    console.error('Error in metrics-simple:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

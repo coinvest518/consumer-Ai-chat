@@ -36,43 +36,36 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 exports.__esModule = true;
-var express_adapter_1 = require("../express-adapter");
-function handler(req, res) {
-    return __awaiter(this, void 0, void 0, function () {
-        var userId;
+exports.expressAdapter = exports.setupResponse = void 0;
+// Utility function to handle CORS and JSON responses
+function setupResponse(req, res) {
+    var allowedOrigins = [
+        'https://consumerai.info',
+        'https://www.consumerai.info',
+        'http://localhost:5173',
+        'http://localhost:3000'
+    ];
+    var origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+    else {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Content-Type', 'application/json');
+}
+exports.setupResponse = setupResponse;
+function expressAdapter(app) {
+    var _this = this;
+    return function (req, res) { return __awaiter(_this, void 0, void 0, function () {
         return __generator(this, function (_a) {
-            // Set up standardized response headers
-            express_adapter_1.setupResponse(req, res);
-            // Handle preflight requests
-            if (req.method === 'OPTIONS') {
-                res.status(200).end();
-                return [2 /*return*/];
-            }
-            if (req.method !== 'GET') {
-                return [2 /*return*/, res.status(405).json({ error: 'Method not allowed' })];
-            }
-            try {
-                userId = req.query.user_id;
-                if (!userId) {
-                    return [2 /*return*/, res.status(400).json({ error: 'User ID is required' })];
-                }
-                // Return simple default metrics
-                return [2 /*return*/, res.status(200).json({
-                        id: "metrics-" + userId,
-                        user_id: userId,
-                        daily_limit: 5,
-                        chats_used: 0,
-                        is_pro: false,
-                        last_updated: new Date().toISOString(),
-                        created_at: new Date().toISOString()
-                    })];
-            }
-            catch (error) {
-                console.error('Error in metrics-simple:', error);
-                return [2 /*return*/, res.status(500).json({ error: 'Internal server error' })];
-            }
+            app(req, res);
             return [2 /*return*/];
         });
-    });
+    }); };
 }
-exports["default"] = handler;
+exports.expressAdapter = expressAdapter;

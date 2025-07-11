@@ -41,7 +41,8 @@ export const api = {
           console.log('Trying endpoint:', endpoint);
           
           const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           };
           
           // Add auth token if available
@@ -49,24 +50,34 @@ export const api = {
             headers['Authorization'] = `Bearer ${token}`;
           }
           
-          const response = await fetch(endpoint, { headers });
+          const response = await fetch(endpoint, { 
+            headers,
+            credentials: 'same-origin' // This is important for CORS with credentials
+          });
 
           console.log('Response status for', endpoint, ':', response.status);
+          console.log('Response headers:', Object.fromEntries(response.headers.entries()));
           
           if (response.ok) {
-            const contentType = response.headers.get('content-type');
-            if (contentType?.includes('application/json')) {
+            try {
               const data = await response.json();
               console.log('Received data from', endpoint, ':', data);
-              return data;
-            } else {
-              console.log('Non-JSON response from', endpoint);
+              if (data && typeof data === 'object') {
+                return data;
+              } else {
+                console.error('Invalid data format received:', data);
+                lastError = new Error('Invalid data format received');
+                continue;
+              }
+            } catch (parseError) {
+              console.error('JSON parse error:', parseError);
+              lastError = parseError;
               continue;
             }
           } else if (response.status === 404) {
             console.log('Endpoint not found:', endpoint);
             lastError = new Error(`Endpoint ${endpoint} not found`);
-            continue; // Try next endpoint
+            continue;
           } else {
             const errorData = await response.text();
             console.error('API Error Response:', {
@@ -76,12 +87,12 @@ export const api = {
               error: errorData
             });
             lastError = new Error(`HTTP error! status: ${response.status}`);
-            continue; // Try next endpoint
+            continue;
           }
         } catch (fetchError) {
           console.error('Fetch error for', endpoint, ':', fetchError);
           lastError = fetchError;
-          continue; // Try next endpoint
+          continue;
         }
       }
       

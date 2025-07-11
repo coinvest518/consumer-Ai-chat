@@ -25,11 +25,13 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy API requests to the local Express server during development
+      // Proxy API requests to production server for testing
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.NODE_ENV === 'production' 
+          ? 'https://consumerai.info'
+          : 'http://localhost:3000',
         changeOrigin: true,
-        secure: false,
+        secure: true,
       }
     }
   },

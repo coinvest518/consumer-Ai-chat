@@ -227,6 +227,33 @@ app.get('/api/user/metrics', function (req, res) { return __awaiter(void 0, void
         }
     });
 }); });
+// Simple user metrics endpoint
+app.get('/api/user/metrics-simple', function (req, res) { return __awaiter(void 0, void 0, void 0, function () {
+    var userId;
+    return __generator(this, function (_a) {
+        try {
+            userId = req.query.user_id;
+            if (!userId) {
+                return [2 /*return*/, res.status(400).json({ error: 'User ID is required' })];
+            }
+            // Return simple default metrics
+            return [2 /*return*/, res.status(200).json({
+                    id: "metrics-" + userId,
+                    user_id: userId,
+                    daily_limit: 5,
+                    chats_used: 0,
+                    is_pro: false,
+                    last_updated: new Date().toISOString(),
+                    created_at: new Date().toISOString()
+                })];
+        }
+        catch (error) {
+            console.error('Error in metrics-simple:', error);
+            return [2 /*return*/, res.status(500).json({ error: 'Internal server error' })];
+        }
+        return [2 /*return*/];
+    });
+}); });
 // Start server if not running in Vercel
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     app.listen(port, function () {
